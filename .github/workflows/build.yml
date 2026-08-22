@@ -44,8 +44,15 @@ jobs:
             echo "ERROR: Secret TVGATE_KS_BASE64 未设置" >&2
             exit 1
           fi
-          echo "$TVGATE_KS_BASE64" | base64 -d > release.keystore
+          # 用 printf 避免 echo 解释转义字符；tr -d 清除可能的换行/空白
+          printf '%s' "$TVGATE_KS_BASE64" | tr -d '\r\n\t ' | base64 -d > release.keystore
           chmod 600 release.keystore
+          # 校验文件非空
+          if [ ! -s release.keystore ]; then
+            echo "ERROR: release.keystore 解码后为空，请检查 TVGATE_KS_BASE64 是否为有效的 base64" >&2
+            exit 1
+          fi
+          echo "release.keystore 已恢复 ($(wc -c < release.keystore) bytes)"
 
       # 若 qist/tvgate 为私有仓库，请改为带凭据的地址，
       # 例如：https://<TOKEN>@github.com/qist/tvgate.git（TOKEN 存于 Secrets）
