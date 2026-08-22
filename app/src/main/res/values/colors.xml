@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 启动界面配色 -->
+    <color name="splash_bg_dark">#0D1117</color>
+    <color name="splash_bg_light">#FFFFFF</color>
+
+    <color name="splash_logo_color">#2D9CDB</color>
+    <color name="splash_app_name_color">#2D9CDB</color>
+    <color name="splash_status_normal">#667080</color>
+    <color name="splash_status_error">#EB5757</color>
+    <color name="splash_progress_color">#2D9CDB</color>
+
+    <!-- IP 信息卡片配色 -->
+    <color name="splash_ip_card_bg">#0F2D9CDB</color>
+    <color name="splash_ip_card_bg_dark">#1A2D9CDB</color>
+    <color name="splash_ip_card_border">#332D9CDB</color>
+    <color name="splash_ip_hint">#8899AA</color>
+    <color name="splash_ip_address">#2D9CDB</color>
+    <color name="splash_ip_label">#AABBCC</color>
+    <color name="splash_ip_value">#E0E0E0</color>
+    <color name="splash_ip_value_dark">#E0E0E0</color>
+</resources>

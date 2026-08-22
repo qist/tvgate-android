@@ -60,4 +60,6 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.webkit:webkit:1.9.0'
     implementation 'com.google.android.material:material:1.11.0'
+    // ZXing 二维码生成（仅用 core 模块，不需要相机扫码）
+    implementation 'com.google.zxing:core:3.5.3'
 }

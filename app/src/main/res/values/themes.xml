@@ -1,6 +1,16 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 自定义属性：启动界面配色 -->
+    <attr name="colorSplashBackground" format="color" />
+    <attr name="colorSplashAppName" format="color" />
+    <attr name="colorSplashStatus" format="color" />
+
+    <!-- 主主题（DayNight 自动切换深浅色） -->
     <style name="Theme.TVGateApp" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="colorSplashBackground">@color/splash_bg_dark</item>
+        <item name="colorSplashAppName">@color/splash_app_name_color</item>
+        <item name="colorSplashStatus">@color/splash_status_normal</item>
     </style>
 </resources>

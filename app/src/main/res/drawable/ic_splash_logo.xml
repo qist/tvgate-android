@@ -1,0 +1,58 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- 外圈圆环 -->
+    <path
+        android:strokeColor="@color/splash_logo_color"
+        android:strokeWidth="3"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M60,8 A52,52 0 1,1 59.99,8 Z" />
+
+    <!-- 天线左斜杆 -->
+    <path
+        android:strokeColor="@color/splash_logo_color"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M42,38 L60,60" />
+
+    <!-- 天线右斜杆 -->
+    <path
+        android:strokeColor="@color/splash_logo_color"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M78,38 L60,60" />
+
+    <!-- 信号波纹内圈 -->
+    <path
+        android:strokeColor="@color/splash_logo_color"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M38,32 A28,28 0 0,1 82,32" />
+
+    <!-- 信号波纹外圈 -->
+    <path
+        android:strokeColor="@color/splash_logo_color"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M32,28 A38,38 0 0,1 88,28" />
+
+    <!-- 底座横线 -->
+    <path
+        android:strokeColor="@color/splash_logo_color"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M48,72 L72,72" />
+
+    <!-- 中心圆点 -->
+    <path
+        android:fillColor="@color/splash_logo_color"
+        android:pathData="M60,60 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+</vector>

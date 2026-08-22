@@ -4,4 +4,34 @@
     <string name="start_failed">TVGate 服务启动失败：%1$s</string>
     <string name="server_url">http://127.0.0.1:8888</string>
     <string name="abi_unsupported">当前设备架构(%1$s)不支持，无法运行内置服务端。请使用 arm64-v8a / armeabi-v7a / x86_64 设备。</string>
+    <string name="connect_failed">无法连接本地服务(127.0.0.1:8888)，请确认设备为 Android 5.0+ 的 arm 架构，且已授予必要权限。</string>
+
+    <!-- 启动界面信息卡片 -->
+    <string name="lan_access_label">局域网访问地址</string>
+    <string name="tap_to_copy">点击复制地址</string>
+    <string name="copied_to_clipboard">已复制到剪贴板</string>
+    <string name="label_login_url">登录地址</string>
+    <string name="label_account">账号</string>
+    <string name="label_password">密码</string>
+    <string name="label_port">端口</string>
+    <string name="default_account">admin</string>
+    <string name="default_password">admin</string>
+    <string name="default_port">8888</string>
+    <string name="no_network">未检测到局域网 IP，请检查 WiFi 连接</string>
+    <string name="scan_qr_hint">扫描二维码快速访问</string>
+
+    <!-- 遥控器操作提示 -->
+    <string name="remote_hint_title">遥控器</string>
+    <string name="remote_hint_ok">OK:复制地址</string>
+    <string name="remote_hint_back">返回:后台运行</string>
+    <string name="remote_hint_menu">菜单键:同 OK</string>
+    <string name="remote_hint_dpad">方向键:切换焦点</string>
+
+    <!-- 前台通知文案 -->
+    <string name="notif_running_title">TVGate 运行中</string>
+    <string name="notif_running_text">本地转发服务已启动 · 127.0.0.1:8888</string>
+    <string name="notif_channel_name">TVGate 服务</string>
+    <string name="notif_channel_desc">TVGate 本地转发服务运行状态</string>
+    <string name="notif_action_stop">停止服务</string>
+    <string name="notif_action_open">打开</string>
 </resources>

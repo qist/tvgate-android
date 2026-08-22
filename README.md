@@ -1,7 +1,10 @@
 # TVGate Android App
 
-把 TVGate 服务端（Go 编写）内置到 Android App 中，App 启动后在手机本地
-启动转发服务（监听 `127.0.0.1:8888`），并用 WebView 打开 Web 管理界面。
+把 TVGate 服务端（Go 编写）内置到 Android App 中，App 启动后在设备本地
+启动转发服务，并展示局域网访问信息（IP 地址、端口、账号密码、二维码），
+方便手机扫码或输入地址访问 Web 管理界面。
+
+专为**机顶盒、电视盒子、Android TV** 设计，支持遥控器操作。
 
 ## ⚠️ 关于 Android 4.0 的重要说明
 
@@ -20,9 +23,54 @@
 
 ## 支持的 CPU 架构
 
-- `arm64-v8a`（64 位 ARM，主流手机）
-- `armeabi-v7a`（32 位 ARM，老手机）
+- `arm64-v8a`（64 位 ARM，主流手机 / 机顶盒）
+- `armeabi-v7a`（32 位 ARM，老设备）
 - `x86_64`（模拟器 / 少数平板）
+
+## 功能特性
+
+### 后台运行
+
+- App 启动后自动以前台服务（Foreground Service）方式运行 TVGate 服务端
+- 通知栏显示持久通知，包含**局域网访问地址和端口**
+- 通知提供「停止服务」和「打开」操作按钮
+- 按返回键时 App 移到后台运行，不会退出
+
+### 局域网信息展示
+
+启动界面一目了然地显示：
+
+- **局域网 IP 地址和访问端口**（自动检测设备 IP）
+- **登录账号 / 密码**（从 `config.yaml` 动态读取）
+- **访问二维码**（手机扫码即可打开，ZXing 生成）
+- 点击信息卡片可复制访问地址到剪贴板
+
+### 动态配置
+
+App 从 `config.yaml` 读取以下配置并实时更新界面：
+
+| 配置项 | 说明 | 默认值 |
+|---|---|---|
+| `server.port` | 服务监听端口 | `8888` |
+| `web.username` | Web 管理界面账号 | `admin` |
+| `web.password` | Web 管理界面密码 | `admin` |
+| `web.path` | Web 管理界面路径 | `/web/` |
+
+首次启动时 `config.yaml` 可能不存在，TVGate 二进制启动后会自动生成默认配置，
+App 会检测配置文件出现后自动重新读取并更新界面。
+
+### 遥控器支持
+
+专为机顶盒 / 电视盒子优化：
+
+| 按键 | 功能 |
+|---|---|
+| **方向键** | 切换焦点（导航信息卡片） |
+| **OK / 确认键** | 复制访问地址到剪贴板 |
+| **菜单键** | 同 OK 键 |
+| **返回键** | 退到后台运行（不退出 App） |
+
+界面元素支持焦点高亮，遥控器选中时显示蓝色边框。
 
 ## 构建
 
@@ -75,7 +123,7 @@ EOF
 | `TVGATE_KS_ALIAS` | `tvgate` | 密钥别名 |
 | `TVGATE_KS_PASS` | 必填 | 密钥密码 |
 
-产物：`TVGate-v1.0.0-{arm64,arm,x86_64}.apk`（仓库根目录）。
+产物：`TVGate-v{version}-{arm64,arm,x86_64}.apk`（仓库根目录）。
 
 ### 3. 只用 Android Studio / Gradle 构建（不重新编译 .so）
 
@@ -110,10 +158,46 @@ CI 会自动完成「clone 服务端源码 → 交叉编译 → 分架构打包 
 1. `MainActivity` 启动前台服务 `TVGateService`。
 2. `TVGateService` 通过 `BinaryInstaller` 从 `nativeLibraryDir` 取出
    `libtvgate.so` 拷贝到应用私有 `files/` 目录并 `chmod +x`。
-3. 用 `Runtime.exec` 启动 `tvgate -addr 0.0.0.0:8888 -data <filesDir>`。
-4. `MainActivity` 轮询 `127.0.0.1:8888` 就绪后，用 WebView 加载管理界面。
+3. 用 `Runtime.exec` 启动 `tvgate -config <filesDir>/config.yaml`。
+4. `MainActivity` 轮询本地服务端口就绪后，更新界面显示局域网访问信息。
+5. `ConfigParser` 从 `config.yaml` 读取端口、账号、密码、路径。
+6. `NetworkUtils` 检测设备局域网 IP 地址。
+7. 使用 ZXing 生成访问地址二维码显示在界面上。
 
 ## 配置 TVGate
 
-二进制沿用 TVGate 的命令行参数（`-addr`、`-data` 等）和同目录配置文件。
-如需持久化配置，把配置文件放进 `Context.getFilesDir()`（即上面的 `-data` 目录）。
+二进制沿用 TVGate 的 `-config` 参数和同目录配置文件 `config.yaml`。
+配置文件位于应用私有 `files/` 目录（即 `-data` 目录）。
+
+### config.yaml 示例
+
+```yaml
+server:
+  port: 8888
+
+web:
+  username: admin
+  password: admin
+  path: /web/
+```
+
+修改 `config.yaml` 后重启 App 即可生效。App 会自动读取最新配置并更新
+界面显示的端口、账号、密码和二维码。
+
+## 项目结构
+
+```
+app/src/main/
+├── java/com/tvgate/app/
+│   ├── MainActivity.kt       # 启动界面、遥控器处理、信息展示
+│   ├── TVGateService.kt      # 前台服务，常驻运行服务端二进制
+│   ├── BinaryInstaller.kt    # 从 jniLibs 提取并安装二进制
+│   ├── ConfigParser.kt       # 解析 config.yaml 配置文件
+│   └── NetworkUtils.kt      # 获取设备局域网 IP 地址
+├── res/
+│   ├── layout/activity_main.xml   # 启动界面布局
+│   ├── drawable/                   # 图标、卡片背景、焦点样式
+│   ├── values/                     # 颜色、字符串、主题
+│   └── anim/                        # 启动动画
+└── AndroidManifest.xml
+```
