@@ -25,6 +25,15 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+# ---- 加载本地 .env（可选，提供 SDK 路径等；CI 不依赖） ----
+if [ -f "$ROOT/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$ROOT/.env"
+  set +a
+fi
+
 TVGATE_SRC="${TVGATE_SRC:-$(cd "$ROOT/../tvgate" 2>/dev/null && pwd)}"
 JNILIBS="$ROOT/app/src/main/jniLibs"
 

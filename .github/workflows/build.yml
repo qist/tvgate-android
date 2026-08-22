@@ -33,10 +33,10 @@ jobs:
         with:
           packages: 'platform-tools build-tools;34.0.0 platforms;android-35 ndk;25.2.9519653'
 
-      - name: Restore release keystore from secret
-        run: |
-          echo "${{ secrets.TVGATE_KS_BASE64 }}" | base64 -d > release.keystore
-          chmod 600 release.keystore
+      # 签名密钥由 build-android-split.sh 从 secret 注入的 TVGATE_KS_BASE64 环境变量生成，
+      # 不在仓库内放置密钥文件。
+      - name: Export keystore secret as env
+        run: echo "TVGATE_KS_BASE64=${{ secrets.TVGATE_KS_BASE64 }}" >> "$GITHUB_ENV"
 
       # 若 qist/tvgate 为私有仓库，请改为带凭据的地址，
       # 例如：https://<TOKEN>@github.com/qist/tvgate.git（TOKEN 存于 Secrets）

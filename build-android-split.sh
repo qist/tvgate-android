@@ -46,7 +46,26 @@ APK_OUT="$ROOT/app/build/outputs/apk/release"
 KS="${TVGATE_KS_FILE:-$ROOT/release.keystore}"
 KS_ALIAS="${TVGATE_KS_ALIAS:-tvgate}"
 KS_PASS="${TVGATE_KS_PASS:?请设置环境变量 TVGATE_KS_PASS（密钥密码），或写入 .env}"
-[ -f "$KS" ] || { echo "ERROR: 找不到签名密钥 $KS（请放到仓库根，或设置 TVGATE_KS_FILE）" >&2; exit 1; }
+
+# ---- 若密钥文件不存在，则尝试从环境变量生成 ----
+# CI 不入库密钥文件，可由 GitHub Secrets 注入以下任一变量：
+#   TVGATE_KS_BASE64  keystore 的 base64 内容（推荐）
+#   TVGATE_KS_B64     同上（备选命名）
+# 本地亦可：echo "TVGATE_KS_BASE64=$(base64 -w0 release.keystore)" >> .env
+if [ ! -f "$KS" ]; then
+  if [ -n "${TVGATE_KS_BASE64:-}" ]; then
+    echo "release.keystore 不存在，从环境变量 TVGATE_KS_BASE64 生成…"
+    printf '%s' "$TVGATE_KS_BASE64" | base64 -d > "$KS"
+  elif [ -n "${TVGATE_KS_B64:-}" ]; then
+    echo "release.keystore 不存在，从环境变量 TVGATE_KS_B64 生成…"
+    printf '%s' "$TVGATE_KS_B64" | base64 -d > "$KS"
+  else
+    echo "ERROR: 找不到签名密钥 $KS，且未提供 TVGATE_KS_BASE64 / TVGATE_KS_B64（请放置密钥文件或设置环境变量）" >&2
+    exit 1
+  fi
+  chmod 600 "$KS"
+fi
+[ -f "$KS" ] || { echo "ERROR: 找不到签名密钥 $KS" >&2; exit 1; }
 
 ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
 
