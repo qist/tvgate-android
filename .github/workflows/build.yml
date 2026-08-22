@@ -44,40 +44,12 @@ jobs:
             echo "ERROR: Secret TVGATE_KS_BASE64 未设置" >&2
             exit 1
           fi
-
-          # ---- 诊断信息（不会泄露 secret 内容，GitHub 会自动掩码） ----
-          echo "=== 诊断 TVGATE_KS_BASE64 ==="
-          echo "原始长度(字符): ${#TVGATE_KS_BASE64}"
-          # 检查是否包含换行符
-          if printf '%s' "$TVGATE_KS_BASE64" | grep -qP '[\r\n]'; then
-            echo "警告: secret 中包含换行符"
-            echo "换行符数量: $(printf '%s' "$TVGATE_KS_BASE64" | grep -oP '\n' | wc -l)"
-          else
-            echo "无换行符"
-          fi
-          # 检查是否包含非 base64 字符（A-Za-z0-9+/= 以外）
-          non_b64=$(printf '%s' "$TVGATE_KS_BASE64" | tr -d '\r\n\t ' | grep -oP '[^A-Za-z0-9+/=]' || true)
-          if [ -n "$non_b64" ]; then
-            echo "警告: secret 中包含非 base64 字符:"
-            printf '%s' "$TVGATE_KS_BASE64" | tr -d '\r\n\t ' | grep -oP '[^A-Za-z0-9+/=]' | head -20 | xxd | head -5
-          else
-            echo "无非法 base64 字符"
-          fi
-          # 打印清理后的长度和前10字符的 hex（不泄露内容）
-          cleaned=$(printf '%s' "$TVGATE_KS_BASE64" | tr -d '\r\n\t ')
-          echo "清理后长度: ${#cleaned}"
-          echo "前10字符hex: $(printf '%s' "$cleaned" | head -c 10 | xxd -p)"
-          echo "=============================="
-
-          # 用 printf 避免 echo 解释转义字符；tr -d 清除可能的换行/空白
           printf '%s' "$TVGATE_KS_BASE64" | tr -d '\r\n\t ' | base64 -d > release.keystore
           chmod 600 release.keystore
-          # 校验文件非空
           if [ ! -s release.keystore ]; then
-            echo "ERROR: release.keystore 解码后为空，请检查 TVGATE_KS_BASE64 是否为有效的 base64" >&2
+            echo "ERROR: release.keystore 解码后为空，请检查 TVGATE_KS_BASE64" >&2
             exit 1
           fi
-          echo "release.keystore 已恢复 ($(wc -c < release.keystore) bytes)"
 
       # 若 qist/tvgate 为私有仓库，请改为带凭据的地址，
       # 例如：https://<TOKEN>@github.com/qist/tvgate.git（TOKEN 存于 Secrets）
