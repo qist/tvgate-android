@@ -64,6 +64,7 @@ jobs:
       - name: Build split APKs (signed)
         env:
           TVGATE_KS_PASS: ${{ secrets.TVGATE_KS_PASS }}
+          TVGATE_SRC: /tmp/tvgate
         run: |
           ./build-android-split.sh
 
