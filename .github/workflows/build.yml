@@ -1,0 +1,62 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TVGATE_KS_ALIAS: tvgate
+    steps:
+      - name: Checkout (tvgate-android)
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+
+      - name: Set up Android SDK & NDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools build-tools;34.0.0 platforms;android-35 ndk;25.2.9519653'
+
+      - name: Restore release keystore from secret
+        run: |
+          echo "${{ secrets.TVGATE_KS_BASE64 }}" | base64 -d > release.keystore
+          chmod 600 release.keystore
+
+      # 若 qist/tvgate 为私有仓库，请改为带凭据的地址，
+      # 例如：https://<TOKEN>@github.com/qist/tvgate.git（TOKEN 存于 Secrets）
+      - name: Checkout TVGate server source
+        run: |
+          git clone --depth 1 https://github.com/qist/tvgate.git /tmp/tvgate
+
+      - name: Cross-compile native libs
+        run: |
+          TVGATE_SRC=/tmp/tvgate ./build-android.sh all
+
+      - name: Build split APKs (signed)
+        env:
+          TVGATE_KS_PASS: ${{ secrets.TVGATE_KS_PASS }}
+        run: |
+          ./build-android-split.sh
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvgate-apks
+          path: |
+            TVGate-v1.0.0-*.apk

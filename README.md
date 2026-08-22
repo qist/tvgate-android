@@ -24,11 +24,23 @@
 - `armeabi-v7a`（32 位 ARM，老手机）
 - `x86_64`（模拟器 / 少数平板）
 
-## 构建步骤
+## 构建
 
-### 1. 交叉编译 Go 服务端二进制
+本仓库包含完整构建链：`build-android.sh` 交叉编译 Go 服务端为 `.so`，
+`build-android-split.sh` 分架构打包并签名 APK。
 
-在仓库根目录执行（需 Go 1.21+）：
+### 前置依赖
+
+- Go 1.25+
+- Android NDK（`$ANDROID_NDK_HOME` 或 `$ANDROID_HOME/ndk/*`）
+- Android SDK（build-tools 含 `zipalign` / `apksigner`）
+- TVGate 服务端源码（`$TVGATE_SRC`，默认 `../tvgate`）
+
+  ```bash
+  git clone https://github.com/qist/tvgate.git ../tvgate
+  ```
+
+### 1. 交叉编译服务端二进制
 
 ```bash
 # 编译全部架构（推荐）
@@ -38,32 +50,66 @@
 ./build-android.sh arm64-v8a
 ```
 
-脚本会把二进制放入 `app/src/main/assets/<abi>/tvgate.bin`。
+脚本把二进制放入 `app/src/main/jniLibs/<abi>/libtvgate.so`。
 
-> 若 TVGate 使用了 cgo（例如某些 DNS 库），需要把 `CC` 指向 Android NDK
-> 的 clang，并设置 `CGO_ENABLED=1`。当前脚本默认 `CGO_ENABLED=0`（纯 Go）。
+> armv7 / x86_64 需要 quic-go 的 cgo，脚本会自动用 Android NDK 的 clang
+> 作为 C 交叉编译器（`CGO_ENABLED=1`）。
 
-### 2. 生成 Gradle Wrapper（首次）
-
-`gradle-wrapper.jar` 是二进制，未纳入版本库。在 `android/` 目录执行：
+### 2. 构建并签名 APK
 
 ```bash
-gradle wrapper --gradle-version 8.6
+# 首次配置本地签名（.env 已 git 忽略，只需写一次）：
+cat > .env <<'EOF'
+TVGATE_KS_PASS=你的密钥密码
+EOF
+
+# 分架构产出 3 个可直接安装的 APK
+./build-android-split.sh
 ```
 
-（需本机已安装 Gradle；或用 Android Studio 打开工程时自动生成。）
+签名参数（都可用环境变量覆盖）：
 
-### 3. 用 Android Studio 打开 `android/` 目录并构建
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `TVGATE_KS_FILE` | `./release.keystore` | 密钥文件路径（本地存放，不入库） |
+| `TVGATE_KS_ALIAS` | `tvgate` | 密钥别名 |
+| `TVGATE_KS_PASS` | 必填 | 密钥密码 |
 
-`Build → Build Bundle(s) / APK(s) → Build APK(s)`
+产物：`TVGate-v1.0.0-{arm64,arm,x86_64}.apk`（仓库根目录）。
 
-产物位于 `android/app/build/outputs/apk/`。
+### 3. 只用 Android Studio / Gradle 构建（不重新编译 .so）
+
+源码已内置编译好的三个架构二进制，直接：
+
+```
+Build → Build Bundle(s) / APK(s) → Build APK(s)
+```
+
+产物位于 `app/build/outputs/apk/`。
+
+## GitHub Actions 自动构建
+
+仓库已配置 `.github/workflows/build.yml`：push 到 `main` 或手动触发后，
+CI 会自动完成「clone 服务端源码 → 交叉编译 → 分架构打包 → 签名 → 上传产物」。
+
+### 需要配置的 Secrets（仓库 Settings → Secrets and variables → Actions）
+
+| Secret | 内容 |
+|---|---|
+| `TVGATE_KS_BASE64` | `base64 -w0 release.keystore` 的输出（密钥文件本身不入库） |
+| `TVGATE_KS_PASS` | 密钥密码 |
+
+密钥别名 CI 默认 `tvgate`（workflow 中 `env.TVGATE_KS_ALIAS` 可改）。
+构建完成后在 Actions 页面下载 `tvgate-apks` artifact。
+
+> 若 `qist/tvgate` 为私有仓库，请把 workflow 里的 clone 地址改为带凭据的
+> URL（凭据存为另一个 Secret）。
 
 ## 工作原理
 
 1. `MainActivity` 启动前台服务 `TVGateService`。
-2. `TVGateService` 通过 `BinaryInstaller` 把 assets 里的二进制
-   拷贝到应用私有 `files/` 目录并 `chmod +x`。
+2. `TVGateService` 通过 `BinaryInstaller` 从 `nativeLibraryDir` 取出
+   `libtvgate.so` 拷贝到应用私有 `files/` 目录并 `chmod +x`。
 3. 用 `Runtime.exec` 启动 `tvgate -addr 0.0.0.0:8888 -data <filesDir>`。
 4. `MainActivity` 轮询 `127.0.0.1:8888` 就绪后，用 WebView 加载管理界面。
 
