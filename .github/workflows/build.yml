@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -64,9 +64,27 @@ jobs:
         run: |
           ./build-android-split.sh
 
-      - name: Upload APKs
-        uses: actions/upload-artifact@v4
+      - name: Read TVGate version
+        id: version
+        run: |
+          TVGATE_VERSION=$(tr -d '[:space:]' < /tmp/tvgate/config/version)
+          echo "version=$TVGATE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "TVGate version: $TVGATE_VERSION"
+
+      - name: Create Release and Upload APKs
+        uses: softprops/action-gh-release@v2
         with:
-          name: tvgate-apks
-          path: |
-            TVGate-v1.0.0-*.apk
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          body: |
+            TVGate Android APK ${{ steps.version.outputs.version }}
+
+            - arm64-v8a (64位 ARM，主流设备)
+            - armeabi-v7a (32位 ARM，老设备)
+            - x86_64 (模拟器 / Chromebox)
+          files: |
+            TVGate-${{ steps.version.outputs.version }}-arm64.apk
+            TVGate-${{ steps.version.outputs.version }}-arm.apk
+            TVGate-${{ steps.version.outputs.version }}-x86_64.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -16,9 +16,10 @@
 # 本地可写一个 .env（git 忽略）免去每次 export；CI 由 GitHub Secrets 注入。
 #
 # 产物（release.keystore 签名，可直接安装）：
-#   TVGate-v1.0.0-arm64.apk
-#   TVGate-v1.0.0-arm.apk
-#   TVGate-v1.0.0-x86_64.apk
+#   TVGate-<version>-arm64.apk
+#   TVGate-<version>-arm.apk
+#   TVGate-<version>-x86_64.apk
+# 版本号从 TVGate 源码的 config/version 文件读取，与 tvgate 仓库 tag 一致。
 #
 # 依赖：Go 1.25+ / Android NDK / Android SDK（build-tools 含 zipalign / apksigner）
 #       / TVGate 服务端源码（见 build-android.sh）
@@ -39,6 +40,16 @@ fi
 
 # 确保 TVGATE_SRC 能传递给 build-android.sh
 export TVGATE_SRC="${TVGATE_SRC:-$(cd "$ROOT/../tvgate" 2>/dev/null && pwd)}"
+
+# ---- 读取 TVGate 版本号（与 tvgate 仓库 tag 一致） ----
+VERSION_FILE="$TVGATE_SRC/config/version"
+if [ ! -f "$VERSION_FILE" ]; then
+  echo "ERROR: 找不到版本文件 $VERSION_FILE" >&2
+  exit 1
+fi
+TVGATE_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+echo "TVGate version: $TVGATE_VERSION"
+export TVGATE_VERSION
 
 ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}"
 export ANDROID_HOME
@@ -101,7 +112,7 @@ build_apk() {
 
   local unsigned="$APK_OUT/app-release-unsigned.apk"
   local aligned="/tmp/tvgate-$short-aligned.apk"
-  local final="$ROOT/TVGate-v1.0.0-$short.apk"
+  local final="$ROOT/TVGate-${TVGATE_VERSION}-$short.apk"
 
   rm -f "$aligned" "$final"
   zipalign -p 4 "$unsigned" "$aligned"
@@ -134,5 +145,5 @@ for abi in "${ABIS[@]}"; do
   cp "$ROOT/build-artifacts/$abi/libtvgate.so" "$JNILIBS/$abi/libtvgate.so"
 done
 
-echo "Done. 独立 APK 已生成："
-ls -la "$ROOT"/TVGate-v1.0.0-*.apk
+echo "Done. 独立 APK 已生成（版本 $TVGATE_VERSION）："
+ls -la "$ROOT"/TVGate-${TVGATE_VERSION}-*.apk
