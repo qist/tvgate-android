@@ -13,3 +13,10 @@ local.properties
 /app/pkg/
 /build-artifacts/
 .env
+
+# Native libs (由 build-android.sh 编译产物，不入库)
+*.so
+
+# APK 构建产物
+*.apk
+*.apk.idsig
