@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">TVGate</string>
+    <string name="starting">正在启动 TVGate 服务…</string>
+    <string name="start_failed">TVGate 服务启动失败：%1$s</string>
+    <string name="server_url">http://127.0.0.1:8888</string>
+    <string name="abi_unsupported">当前设备架构(%1$s)不支持，无法运行内置服务端。请使用 arm64-v8a / armeabi-v7a / x86_64 设备。</string>
+</resources>
