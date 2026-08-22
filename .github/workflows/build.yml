@@ -76,6 +76,7 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.version }}
           name: ${{ steps.version.outputs.version }}
+          prerelease: false
           body: |
             TVGate Android APK ${{ steps.version.outputs.version }}
 
