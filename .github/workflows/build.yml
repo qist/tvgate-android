@@ -57,10 +57,6 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/qist/tvgate.git /tmp/tvgate
 
-      - name: Cross-compile native libs
-        run: |
-          TVGATE_SRC=/tmp/tvgate ./build-android.sh all
-
       - name: Build split APKs (signed)
         env:
           TVGATE_KS_PASS: ${{ secrets.TVGATE_KS_PASS }}

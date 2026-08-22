@@ -37,6 +37,9 @@ if [ -f "$ROOT/.env" ]; then
   echo "Loaded $ROOT/.env"
 fi
 
+# 确保 TVGATE_SRC 能传递给 build-android.sh
+export TVGATE_SRC="${TVGATE_SRC:-$(cd "$ROOT/../tvgate" 2>/dev/null && pwd)}"
+
 ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}"
 export ANDROID_HOME
 export PATH="$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort | tail -1)"
