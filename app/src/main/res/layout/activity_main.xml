@@ -11,250 +11,275 @@
         android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <!-- 启动界面 -->
+    <!--
+        启动界面：使用 weightSum 三段式布局
+        - 顶部：Logo + 状态（固定高度，wrap_content）
+        - 中间：二维码 + 信息卡片（弹性高度，weight=1，可压缩）
+        - 底部：遥控器提示 + 重启按钮（固定高度，wrap_content，始终可见）
+        这样无论屏幕分辨率如何，底部遥控器栏都不会被挤出可视区域。
+    -->
     <LinearLayout
         android:id="@+id/splashContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:gravity="center"
-        android:padding="32dp">
+        android:weightSum="1"
+        android:padding="24dp">
 
-        <!-- Logo + 名称 横排 -->
+        <!-- ===== 顶部：Logo + 名称 + 状态 ===== -->
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <ImageView
-                android:id="@+id/splashLogo"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:src="@drawable/ic_splash_logo"
-                android:contentDescription="@string/app_name" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/splashAppName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/app_name"
-                    android:textSize="28sp"
-                    android:textStyle="bold"
-                    android:textColor="?attr/colorSplashAppName"
-                    android:letterSpacing="0.05" />
-
-                <TextView
-                    android:id="@+id/splashSubtitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="TV Gateway"
-                    android:textSize="13sp"
-                    android:textColor="?attr/colorSplashStatus"
-                    android:alpha="0.6" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <!-- 进度 + 状态 -->
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <ProgressBar
-                android:id="@+id/progressBar"
-                style="?android:attr/progressBarStyle"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:indeterminateDrawable="@anim/splash_progress_rotate"
-                android:visibility="visible"
-                android:layout_marginEnd="8dp" />
-
-            <TextView
-                android:id="@+id/statusText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/starting"
-                android:textSize="14sp"
-                android:textColor="?attr/colorSplashStatus"
-                android:visibility="visible"
-                android:maxLines="1"
-                android:gravity="center" />
-        </LinearLayout>
-
-        <!-- 二维码 -->
-        <ImageView
-            android:id="@+id/qrCodeImage"
-            android:layout_width="180dp"
-            android:layout_height="180dp"
-            android:layout_marginTop="20dp"
-            android:layout_gravity="center"
-            android:contentDescription="@string/scan_qr_hint"
-            android:background="#FFFFFF"
-            android:padding="8dp" />
-
-        <!-- 二维码下方提示 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:layout_gravity="center"
-            android:text="@string/scan_qr_hint"
-            android:textSize="11sp"
-            android:textColor="@color/splash_ip_hint"
-            android:alpha="0.8" />
-
-        <!-- ===== 信息卡片 ===== -->
-        <LinearLayout
-            android:id="@+id/ipCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:orientation="vertical"
-            android:background="@drawable/ip_card_bg_focusable"
-            android:padding="18dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:visibility="gone">
+            android:gravity="center_horizontal"
+            android:paddingTop="8dp">
 
-            <!-- 访问地址 -->
-            <TextView
-                android:id="@+id/ipAddressText"
+            <!-- Logo + 名称 横排 -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:fontFamily="monospace"
-                android:textColor="@color/splash_ip_address"
-                android:textIsSelectable="true" />
-
-            <!-- 分隔线 -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="8dp"
-                android:background="@color/splash_ip_card_border" />
-
-            <!-- 账号 / 密码 / 端口 三列 -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:weightSum="3">
+                android:gravity="center_vertical">
 
-                <!-- 账号 -->
+                <ImageView
+                    android:id="@+id/splashLogo"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:src="@drawable/ic_splash_logo"
+                    android:contentDescription="@string/app_name" />
+
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
 
                     <TextView
+                        android:id="@+id/splashAppName"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/label_account"
-                        android:textSize="11sp"
-                        android:textColor="@color/splash_ip_hint" />
-
-                    <TextView
-                        android:id="@+id/accountValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/default_account"
-                        android:textSize="15sp"
+                        android:text="@string/app_name"
+                        android:textSize="24sp"
                         android:textStyle="bold"
-                        android:fontFamily="monospace"
-                        android:textColor="@color/splash_ip_value" />
-                </LinearLayout>
-
-                <!-- 密码 -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
+                        android:textColor="?attr/colorSplashAppName"
+                        android:letterSpacing="0.05" />
 
                     <TextView
+                        android:id="@+id/splashSubtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/label_password"
-                        android:textSize="11sp"
-                        android:textColor="@color/splash_ip_hint" />
-
-                    <TextView
-                        android:id="@+id/passwordValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/default_password"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        android:fontFamily="monospace"
-                        android:textColor="@color/splash_ip_value" />
-                </LinearLayout>
-
-                <!-- 端口 -->
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/label_port"
-                        android:textSize="11sp"
-                        android:textColor="@color/splash_ip_hint" />
-
-                    <TextView
-                        android:id="@+id/portValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/default_port"
-                        android:textSize="15sp"
-                        android:textStyle="bold"
-                        android:fontFamily="monospace"
-                        android:textColor="@color/splash_ip_value" />
+                        android:text="TV Gateway"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorSplashStatus"
+                        android:alpha="0.6" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- 点击复制提示 -->
-            <TextView
-                android:id="@+id/ipCopyHint"
+            <!-- 进度 + 状态 -->
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ProgressBar
+                    android:id="@+id/progressBar"
+                    style="?android:attr/progressBarStyle"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:indeterminateDrawable="@anim/splash_progress_rotate"
+                    android:visibility="visible"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/starting"
+                    android:textSize="13sp"
+                    android:textColor="?attr/colorSplashStatus"
+                    android:visibility="visible"
+                    android:maxLines="1"
+                    android:gravity="center" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ===== 中间：二维码 + 信息卡片（弹性高度，可压缩） ===== -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginTop="8dp">
+
+            <!-- 二维码 -->
+            <ImageView
+                android:id="@+id/qrCodeImage"
+                android:layout_width="160dp"
+                android:layout_height="160dp"
                 android:layout_gravity="center"
-                android:text="@string/tap_to_copy"
-                android:textSize="10sp"
+                android:contentDescription="@string/scan_qr_hint"
+                android:background="#FFFFFF"
+                android:padding="8dp" />
+
+            <!-- 二维码下方提示 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_gravity="center"
+                android:text="@string/scan_qr_hint"
+                android:textSize="11sp"
                 android:textColor="@color/splash_ip_hint"
-                android:alpha="0.7" />
+                android:alpha="0.8" />
+
+            <!-- ===== 信息卡片 ===== -->
+            <LinearLayout
+                android:id="@+id/ipCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:background="@drawable/ip_card_bg_focusable"
+                android:padding="14dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:visibility="gone">
+
+                <!-- 访问地址 -->
+                <TextView
+                    android:id="@+id/ipAddressText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/splash_ip_address"
+                    android:textIsSelectable="true" />
+
+                <!-- 分隔线 -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="6dp"
+                    android:background="@color/splash_ip_card_border" />
+
+                <!-- 账号 / 密码 / 端口 三列 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:weightSum="3">
+
+                    <!-- 账号 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/label_account"
+                            android:textSize="11sp"
+                            android:textColor="@color/splash_ip_hint" />
+
+                        <TextView
+                            android:id="@+id/accountValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/default_account"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            android:textColor="@color/splash_ip_value" />
+                    </LinearLayout>
+
+                    <!-- 密码 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/label_password"
+                            android:textSize="11sp"
+                            android:textColor="@color/splash_ip_hint" />
+
+                        <TextView
+                            android:id="@+id/passwordValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/default_password"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            android:textColor="@color/splash_ip_value" />
+                    </LinearLayout>
+
+                    <!-- 端口 -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/label_port"
+                            android:textSize="11sp"
+                            android:textColor="@color/splash_ip_hint" />
+
+                        <TextView
+                            android:id="@+id/portValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/default_port"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:fontFamily="monospace"
+                            android:textColor="@color/splash_ip_value" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- 点击复制提示 -->
+                <TextView
+                    android:id="@+id/ipCopyHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_gravity="center"
+                    android:text="@string/tap_to_copy"
+                    android:textSize="10sp"
+                    android:textColor="@color/splash_ip_hint"
+                    android:alpha="0.7" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-        <!-- ===== 遥控器操作提示 + 重启内核按钮 ===== -->
+        <!-- ===== 底部：遥控器操作提示 + 重启内核按钮（固定底部，始终可见） ===== -->
         <LinearLayout
             android:id="@+id/remoteHintCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="8dp"
             android:orientation="vertical"
             android:gravity="center"
             android:background="@drawable/remote_hint_bg"
@@ -306,21 +331,21 @@
                 android:id="@+id/btnRestart"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
                 android:layout_gravity="center"
                 android:background="@drawable/btn_restart_bg"
                 android:paddingLeft="20dp"
                 android:paddingRight="20dp"
-                android:paddingTop="2dp"
-                android:paddingBottom="6dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="8dp"
                 android:minWidth="120dp"
-                android:minHeight="32dp"
+                android:minHeight="36dp"
                 android:gravity="center"
                 android:singleLine="true"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="@string/btn_restart"
-                android:textSize="13sp"
+                android:textSize="14sp"
                 android:textScaleX="1.0"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"

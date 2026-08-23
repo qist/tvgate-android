@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.ConnectivityManager
@@ -15,6 +16,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.DisplayMetrics
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
 import android.view.animation.AnimationUtils
@@ -57,6 +60,19 @@ class MainActivity : AppCompatActivity() {
 
     // 当前配置（首次启动时 config.yaml 可能还不存在，用默认值）
     private var config: TVGateConfig = TVGateConfig()
+
+    // 屏幕分辨率等级
+    private enum class ScreenTier {
+        PHONE,      // 手机（宽度 < 600dp）
+        TABLET,     // 平板（600dp ≤ 宽度 < 960dp）
+        TV_720,     // 电视 720p
+        TV_1080,    // 电视 1080p
+        TV_4K       // 电视 4K
+    }
+    private var screenTier = ScreenTier.PHONE
+    private var densityDpi = 320
+    private var screenWidthPx = 1080
+    private var screenHeightPx = 1920
 
     // 接收服务端进程的错误信息
     private val errorReceiver = object : android.content.BroadcastReceiver() {
@@ -113,6 +129,10 @@ class MainActivity : AppCompatActivity() {
         portValue = findViewById(R.id.portValue)
         remoteHintCard = findViewById(R.id.remoteHintCard)
         btnRestart = findViewById(R.id.btnRestart)
+
+        // 检测屏幕分辨率，自适应 UI 元素大小
+        detectScreenTier()
+        applyUiScaling()
 
         setupWebView()
         playSplashAnimations()
@@ -177,6 +197,142 @@ class MainActivity : AppCompatActivity() {
 
         // 注册网络变化监听，网络切换时刷新 IP 和二维码
         registerNetworkCallback()
+    }
+
+    /**
+     * 检测屏幕分辨率等级。
+     *
+     * TV 设备常见分辨率：
+     *   - 720p  (1280×720)
+     *   - 1080p (1920×1080)
+     *   - 4K    (3840×2160)
+     *
+     * 根据 uiMode 判断是否为 TV，再根据像素高度判断分辨率等级。
+     */
+    private fun detectScreenTier() {
+        val dm = DisplayMetrics()
+        windowManager.defaultDisplay.getRealMetrics(dm)
+        densityDpi = dm.densityDpi
+        screenWidthPx = dm.widthPixels
+        screenHeightPx = dm.heightPixels
+
+        val config = resources.configuration
+        val isTvMode = (config.uiMode and Configuration.UI_MODE_TYPE_MASK) ==
+                Configuration.UI_MODE_TYPE_TELEVISION
+
+        // 将像素宽度换算为 dp（消除 DPI 影响）
+        val widthDp = screenWidthPx.toFloat() / dm.density
+
+        // 判断是否为 TV / 大屏设备：
+        // 很多电视盒子和 TV（如海信）不声明 UI_MODE_TYPE_TELEVISION，
+        // 也不报告 SCREENLAYOUT_SIZE_XLARGE，甚至声称有触摸屏。
+        // 因此最可靠的方法是直接看像素分辨率：
+        //   - 屏幕短边 >= 720px 且长边 >= 1280px → 至少是 720p 级别的大屏
+        //   - 屏幕短边 >= 1080px → 至少是 1080p 级别
+        //   - 屏幕短边 >= 2000px → 4K 级别
+        // 同时检查 uiMode 作为辅助判断。
+        val shortSide = minOf(screenWidthPx, screenHeightPx)
+        val isTv = isTvMode || shortSide >= 720
+
+        screenTier = when {
+            // 按像素短边判断分辨率等级（适用于 TV 和大屏）
+            isTv && shortSide >= 2000 -> ScreenTier.TV_4K
+            isTv && shortSide >= 1000 -> ScreenTier.TV_1080
+            isTv && shortSide >= 700 -> ScreenTier.TV_720
+            // 非 TV 小屏：按 dp 宽度区分手机/平板
+            widthDp >= 600 -> ScreenTier.TABLET
+            else -> ScreenTier.PHONE
+        }
+
+        android.util.Log.i("TVGate", "Screen: ${screenWidthPx}x${screenHeightPx} " +
+                "dpi=$densityDpi density=${dm.density} tier=$screenTier isTv=$isTv " +
+                "isTvMode=$isTvMode shortSide=$shortSide")
+    }
+
+    /**
+     * 根据屏幕分辨率等级，动态缩放 UI 元素。
+     *
+     * - 手机：默认尺寸（布局 XML 中的值）
+     * - 平板：略放大
+     * - TV 720p：默认尺寸，确保紧凑
+     * - TV 1080p：适度放大二维码和文字
+     * - TV 4K：大幅放大，确保远距离可见
+     */
+    private fun applyUiScaling() {
+        // 缩放因子：基于屏幕高度和基准高度（1920px）的比例
+        val heightScale = screenHeightPx.toFloat() / 1920f
+        val sizeScale = when (screenTier) {
+            ScreenTier.PHONE -> 1.0f
+            ScreenTier.TABLET -> 1.1f
+            ScreenTier.TV_720 -> 0.85f   // 720p 屏幕空间小，缩小避免溢出
+            ScreenTier.TV_1080 -> 1.0f   // 1080p 是基准
+            ScreenTier.TV_4K -> 1.6f     // 4K 需要放大才能看清
+        }
+
+        // 综合缩放：取分辨率缩放和屏幕等级缩放的较大值
+        val scale = maxOf(heightScale, sizeScale).coerceIn(0.7f, 2.5f)
+
+        // 二维码大小（dp 转 px）
+        val qrDp = (140 * scale).toInt().coerceIn(100, 300)
+        val qrPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, qrDp.toFloat(), resources.displayMetrics
+        ).toInt()
+        qrCodeImage.layoutParams.apply {
+            width = qrPx
+            height = qrPx
+        }
+        qrCodeImage.requestLayout()
+
+        // Logo 大小
+        val logoDp = (48 * scale).toInt().coerceIn(36, 96)
+        val logoPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, logoDp.toFloat(), resources.displayMetrics
+        ).toInt()
+        splashLogo.layoutParams.apply {
+            width = logoPx
+            height = logoPx
+        }
+        splashLogo.requestLayout()
+
+        // 文字大小缩放
+        val appNameSp = (20 * scale).coerceIn(14f, 36f)
+        findViewById<TextView>(R.id.splashAppName).textSize = appNameSp
+
+        val statusSp = (12 * scale).coerceIn(10f, 20f)
+        statusText.setTextSize(TypedValue.COMPLEX_UNIT_SP, statusSp)
+
+        val ipAddrSp = (15 * scale).coerceIn(12f, 24f)
+        ipAddressText.setTextSize(TypedValue.COMPLEX_UNIT_SP, ipAddrSp)
+
+        val valueSp = (13 * scale).coerceIn(11f, 20f)
+        accountValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
+        passwordValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
+        portValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
+
+        val hintSp = (10 * scale).coerceIn(9f, 16f)
+        findViewById<TextView>(R.id.ipCopyHint).setTextSize(TypedValue.COMPLEX_UNIT_SP, hintSp)
+
+        // 重启按钮文字
+        val btnSp = (13 * scale).coerceIn(11f, 20f)
+        btnRestart.setTextSize(TypedValue.COMPLEX_UNIT_SP, btnSp)
+
+        // 重启按钮 padding 和最小尺寸
+        val padHPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, (16 * scale), resources.displayMetrics
+        ).toInt()
+        val padVPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, (5 * scale), resources.displayMetrics
+        ).toInt()
+        btnRestart.setPadding(padHPx, padVPx, padHPx, padVPx + 2)
+
+        val minW = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, (110 * scale), resources.displayMetrics
+        ).toInt()
+        val minH = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, (32 * scale), resources.displayMetrics
+        ).toInt()
+        btnRestart.minWidth = minW
+        btnRestart.minHeight = minH
     }
 
     /**
