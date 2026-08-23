@@ -29,7 +29,7 @@
 
     <!-- 手动重启按钮 -->
     <string name="btn_restart">重启内核</string>
-    <string name="restart_in_progress">正在重启内核…</string>
+    <string name="restart_in_progress">重启中</string>
     <string name="restart_success">内核已重启</string>
     <string name="restart_failed">重启失败</string>
 

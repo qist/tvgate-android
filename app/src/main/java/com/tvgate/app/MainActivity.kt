@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var passwordValue: TextView
     private lateinit var portValue: TextView
     private lateinit var remoteHintCard: LinearLayout
-    private lateinit var btnRestart: Button
+    private lateinit var btnRestart: TextView
     private val handler = Handler(Looper.getMainLooper())
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 

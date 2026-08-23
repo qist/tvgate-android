@@ -302,21 +302,29 @@
             </LinearLayout>
 
             <!-- 第二行：重启内核按钮 -->
-            <Button
+            <TextView
                 android:id="@+id/btnRestart"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="@string/btn_restart"
-                android:textSize="12sp"
-                android:textColor="@color/splash_logo_color"
+                android:layout_marginTop="4dp"
+                android:layout_gravity="center"
                 android:background="@drawable/btn_restart_bg"
-                android:paddingStart="24dp"
-                android:paddingEnd="24dp"
-                android:paddingTop="6dp"
+                android:paddingLeft="20dp"
+                android:paddingRight="20dp"
+                android:paddingTop="2dp"
                 android:paddingBottom="6dp"
-                android:minHeight="0dp"
-                android:minWidth="0dp"
+                android:minWidth="120dp"
+                android:minHeight="32dp"
+                android:gravity="center"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/btn_restart"
+                android:textSize="13sp"
+                android:textScaleX="1.0"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textAppearance="@null"
                 android:clickable="true"
                 android:focusable="true" />
 
