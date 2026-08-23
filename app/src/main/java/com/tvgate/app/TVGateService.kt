@@ -30,6 +30,8 @@ class TVGateService : Service() {
     private val running = AtomicBoolean(false)
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private val restarting = AtomicBoolean(false)
+    // 标记进程是被主动杀掉的（重启/DNS注入），runServer 线程不应报错
+    private val killedByUs = AtomicBoolean(false)
 
     companion object {
         const val NOTIFY_ID = 1001
@@ -94,9 +96,11 @@ class TVGateService : Service() {
             if (proc != null) {
                 val code = proc.waitFor()
                 Log.i(TAG, "tvgate exited with code $code")
-                if (code != 0) {
+                // 只有非主动杀掉且退出码非0时才报错
+                if (code != 0 && !killedByUs.get()) {
                     sendError("TVGate 进程退出，退出码=$code。请以 -config 确认配置，并查看 logcat 中 TVGateService 的日志。")
                 }
+                killedByUs.set(false)  // 重置标记
             }
         } catch (e: Exception) {
             Log.e(TAG, "run server failed", e)
@@ -227,12 +231,17 @@ class TVGateService : Service() {
                 injectDnsConfig(configFile, newDns)
 
                 // 停止当前进程
+                killedByUs.set(true)
                 process?.destroy()
                 process?.waitFor()
+                Thread.sleep(100)
 
                 // 重新启动
                 val configPath = configFile.absolutePath
                 launchProcess(configPath)
+                // 启动新的监控线程
+                running.set(true)
+                Thread { runServerMonitor() }.start()
                 Log.i(TAG, "tvgate restarted with updated DNS: $newDns")
             } catch (e: Exception) {
                 Log.e(TAG, "handleNetworkChange failed", e)
@@ -323,6 +332,7 @@ class TVGateService : Service() {
         // 重启进程让配置生效
         Log.i(TAG, "restarting tvgate to apply DNS config")
         try {
+            killedByUs.set(true)
             process?.destroy()
             process?.waitFor()
         } catch (_: Exception) {
@@ -381,11 +391,20 @@ class TVGateService : Service() {
         Thread {
             try {
                 Log.i(TAG, "manual restart: stopping current process")
+                killedByUs.set(true)
                 process?.destroy()
                 process?.waitFor()
 
+                // 等待 runServer 线程的 waitFor 返回并重置标记
+                Thread.sleep(100)
+
                 val configPath = File(filesDir, "config.yaml").absolutePath
                 launchProcess(configPath)
+
+                // 启动一个新的 runServer 线程来监控新进程
+                running.set(true)
+                Thread { runServerMonitor() }.start()
+
                 Log.i(TAG, "manual restart: process relaunched")
 
                 // 通知 Activity 重启完成
@@ -397,6 +416,28 @@ class TVGateService : Service() {
                 restarting.set(false)
             }
         }.start()
+    }
+
+    /**
+     * 监控当前进程退出（restartServer 调用后使用）。
+     * 与 runServer 类似但不负责首次启动/DNS注入逻辑。
+     */
+    private fun runServerMonitor() {
+        try {
+            val proc = process
+            if (proc != null) {
+                val code = proc.waitFor()
+                Log.i(TAG, "tvgate exited with code $code")
+                if (code != 0 && !killedByUs.get()) {
+                    sendError("TVGate 进程退出，退出码=$code。请以 -config 确认配置，并查看 logcat 中 TVGateService 的日志。")
+                }
+                killedByUs.set(false)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "runServerMonitor failed", e)
+        } finally {
+            running.set(false)
+        }
     }
 
     private fun sendError(msg: String) {

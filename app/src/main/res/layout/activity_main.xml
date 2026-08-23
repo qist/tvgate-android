@@ -200,7 +200,9 @@
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:fontFamily="monospace"
-                            android:textColor="@color/splash_ip_value" />
+                            android:textColor="@color/splash_ip_value"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
                     </LinearLayout>
 
                     <!-- 密码 -->
@@ -227,7 +229,9 @@
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:fontFamily="monospace"
-                            android:textColor="@color/splash_ip_value" />
+                            android:textColor="@color/splash_ip_value"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
                     </LinearLayout>
 
                     <!-- 端口 -->
@@ -254,7 +258,9 @@
                             android:textSize="14sp"
                             android:textStyle="bold"
                             android:fontFamily="monospace"
-                            android:textColor="@color/splash_ip_value" />
+                            android:textColor="@color/splash_ip_value"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
                     </LinearLayout>
                 </LinearLayout>
 

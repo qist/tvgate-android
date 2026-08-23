@@ -259,18 +259,16 @@ class MainActivity : AppCompatActivity() {
      * - TV 4K：大幅放大，确保远距离可见
      */
     private fun applyUiScaling() {
-        // 缩放因子：基于屏幕高度和基准高度（1920px）的比例
-        val heightScale = screenHeightPx.toFloat() / 1920f
-        val sizeScale = when (screenTier) {
+        // 缩放因子：Android 的 dp 已自动处理 DPI 缩放，
+        // 所以只需要根据设备类型给出额外缩放即可
+        val tvScale = when (screenTier) {
             ScreenTier.PHONE -> 1.0f
-            ScreenTier.TABLET -> 1.1f
-            ScreenTier.TV_720 -> 0.85f   // 720p 屏幕空间小，缩小避免溢出
+            ScreenTier.TABLET -> 1.0f
+            ScreenTier.TV_720 -> 0.9f   // 720p 屏幕空间小，略缩小
             ScreenTier.TV_1080 -> 1.0f   // 1080p 是基准
-            ScreenTier.TV_4K -> 1.6f     // 4K 需要放大才能看清
+            ScreenTier.TV_4K -> 1.2f    // 4K TV 字体略放大，保证远距离可读
         }
-
-        // 综合缩放：取分辨率缩放和屏幕等级缩放的较大值
-        val scale = maxOf(heightScale, sizeScale).coerceIn(0.7f, 2.5f)
+        val scale = tvScale.coerceIn(0.7f, 1.5f)
 
         // 二维码大小（dp 转 px）
         val qrDp = (140 * scale).toInt().coerceIn(100, 300)
@@ -301,13 +299,23 @@ class MainActivity : AppCompatActivity() {
         val statusSp = (12 * scale).coerceIn(10f, 20f)
         statusText.setTextSize(TypedValue.COMPLEX_UNIT_SP, statusSp)
 
-        val ipAddrSp = (15 * scale).coerceIn(12f, 24f)
+        // IP 地址文字：限制最大值避免遮挡
+        val ipAddrSp = (14 * scale).coerceIn(11f, 18f)
         ipAddressText.setTextSize(TypedValue.COMPLEX_UNIT_SP, ipAddrSp)
 
-        val valueSp = (13 * scale).coerceIn(11f, 20f)
+        // 账号/密码/端口值：限制最大值避免三列互相遮挡
+        val valueSp = (13 * scale).coerceIn(10f, 15f)
         accountValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
         passwordValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
         portValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
+        // 确保长文本不溢出列宽
+        accountValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
+        passwordValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
+        portValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
+        for (tv in listOf(accountValue, passwordValue, portValue)) {
+            tv.maxLines = 1
+            tv.ellipsize = android.text.TextUtils.TruncateAt.END
+        }
 
         val hintSp = (10 * scale).coerceIn(9f, 16f)
         findViewById<TextView>(R.id.ipCopyHint).setTextSize(TypedValue.COMPLEX_UNIT_SP, hintSp)
