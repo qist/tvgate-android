@@ -2,6 +2,7 @@ package com.tvgate.app
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.NetworkCapabilities
 import android.os.Build
 import java.net.Inet4Address
@@ -131,6 +132,36 @@ object NetworkUtils {
         if (ip.startsWith("169.254.")) return false
         if (ip.startsWith("0.")) return false
         return true
+    }
+
+    /**
+     * 获取系统 DNS 服务器列表（IPv4）。
+     * 通过 ConnectivityManager 获取活动网络的 DNS 服务器。
+     * 返回形如 ["192.168.1.1", "8.8.8.8"] 的列表。
+     */
+    fun getDnsServers(context: Context): List<String> {
+        val result = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                cm?.let {
+                    val network = it.activeNetwork
+                    val linkProps = it.getLinkProperties(network)
+                    linkProps?.dnsServers?.forEach { inet ->
+                        if (inet is Inet4Address && !inet.isLoopbackAddress) {
+                            val dns = inet.hostAddress
+                            if (!dns.isNullOrBlank() && dns !in result) {
+                                result.add(dns)
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+            }
+        }
+
+        return result
     }
 
     /**

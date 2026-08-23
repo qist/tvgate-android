@@ -55,6 +55,7 @@ App 从 `config.yaml` 读取以下配置并实时更新界面：
 | `web.username` | Web 管理界面账号 | `admin` |
 | `web.password` | Web 管理界面密码 | `admin` |
 | `web.path` | Web 管理界面路径 | `/web/` |
+| `dns.servers` | DNS 服务器列表 | 自动获取设备 DNS |
 
 首次启动时 `config.yaml` 可能不存在，TVGate 二进制启动后会自动生成默认配置，
 App 会检测配置文件出现后自动重新读取并更新界面。
@@ -65,12 +66,29 @@ App 会检测配置文件出现后自动重新读取并更新界面。
 
 | 按键 | 功能 |
 |---|---|
-| **方向键** | 切换焦点（导航信息卡片） |
-| **OK / 确认键** | 复制访问地址到剪贴板 |
+| **方向键** | 切换焦点（导航信息卡片、重启按钮） |
+| **OK / 确认键** | 聚焦信息卡片时复制地址，聚焦重启按钮时重启内核 |
 | **菜单键** | 同 OK 键 |
 | **返回键** | 退到后台运行（不退出 App） |
 
 界面元素支持焦点高亮，遥控器选中时显示蓝色边框。
+
+### 手动重启内核
+
+界面上提供「重启内核」按钮，适用于以下场景：
+
+- 修改 `config.yaml` 后需要让配置生效
+- 服务端异常（如 DNS 失效、连接超时）需要快速恢复
+- 网络环境变化后服务未自动恢复
+
+点击按钮或遥控器 OK 键即可重启 TVGate 内核进程，无需关闭 App：
+
+1. 按钮变为「正在重启内核…」并禁用
+2. Service 停止当前进程并重新启动
+3. 重启完成后界面自动刷新，状态提示「内核已重启」
+4. App 重新轮询服务就绪状态
+
+> 重启仅影响内核进程，前台服务和通知不受影响。
 
 ## 构建
 
@@ -184,16 +202,89 @@ web:
 修改 `config.yaml` 后重启 App 即可生效。App 会自动读取最新配置并更新
 界面显示的端口、账号、密码和二维码。
 
+### DNS 配置
+
+#### 自动注入（默认行为）
+
+Android 系统没有本地 DNS 服务（`[::1]:53` 不存在），Go 标准库的
+`net.Resolver` 在 `PreferGo=true` 模式下会尝试连接本地 DNS，导致域名解析
+失败，表现为 m3u8 等远程资源返回 **Bad Gateway** 或 **502** 错误。
+
+App 会在首次启动时**自动检测** `config.yaml` 中是否已有 `dns.servers`
+配置：
+
+- **没有 DNS 配置** → 自动获取设备当前使用的 DNS 服务器（通过
+  `ConnectivityManager` 读取系统 DNS），注入 `config.yaml`，然后重启
+  TVGate 进程使配置生效。
+- **已有 DNS 配置** → 跳过注入，直接使用用户手动配置的 DNS。
+
+#### 网络环境切换自动适配
+
+当设备网络环境发生变化时（例如从家里 WiFi 切换到外出 4G/5G，或
+反过来），DNS 服务器和本机 IP 地址都会改变。App 会自动处理：
+
+1. **DNS 自动更新**（仅自动注入模式）：
+   - App 注册了 `ConnectivityManager.NetworkCallback`，实时监听网络变化
+   - 网络切换后，自动获取新网络的 DNS 服务器
+   - 如果新 DNS 与当前配置不同，自动更新 `config.yaml` 并重启 TVGate 进程
+   - **用户手动配置的 DNS 不会被覆盖**——只有自动注入的 DNS 才会更新
+
+2. **界面信息刷新**：
+   - 网络切换后，界面上的 IP 地址、访问二维码会自动刷新
+   - 无需手动重启 App
+
+3. **手动配置 DNS 的行为**：
+   - 如果用户手动配置了 `dns.servers`（非自动注入），网络切换时 **不会** 被覆盖
+   - 适用于固定使用公共 DNS（如 `223.5.5.5`）的场景
+   - 如需恢复自动适配，删除 `config.yaml` 中的 `dns` 段并重启 App
+
+#### 手动配置 DNS
+
+如果自动注入的 DNS 不满足需求（例如需要使用公共 DNS、自定义 DNS 或
+DoH/DoT 服务器），可以手动编辑 `config.yaml`，在 `dns` 段指定 DNS 服务器
+列表：
+
+```yaml
+server:
+  port: 8888
+
+web:
+  username: admin
+  password: admin
+  path: /web/
+
+dns:
+  timeout: 5s
+  max_conns: 10
+  servers:
+    - 223.5.5.5       # 阿里 DNS
+    - 119.29.29.29     # 腾讯 DNS
+    # 也可添加自定义 DNS
+    # - 8.8.8.8        # Google DNS
+```
+
+| 字段 | 说明 | 默认值 |
+|---|---|---|
+| `dns.timeout` | 单次 DNS 查询超时时间 | `5s` |
+| `dns.max_conns` | DNS 连接池大小 | `10` |
+| `dns.servers` | DNS 服务器列表（IPv4 地址） | 自动获取设备 DNS |
+
+> **提示**：手动配置 DNS 后，App 不会再自动覆盖。如需恢复自动注入，
+> 删除 `config.yaml` 中的 `dns` 段并重启 App 即可。
+
+> **网络切换**：使用自动注入 DNS 时，网络环境变化（WiFi → 4G/5G）
+> 会自动更新 DNS 并重启服务。手动配置的 DNS 不受影响。
+
 ## 项目结构
 
 ```
 app/src/main/
 ├── java/com/tvgate/app/
-│   ├── MainActivity.kt       # 启动界面、遥控器处理、信息展示
-│   ├── TVGateService.kt      # 前台服务，常驻运行服务端二进制
+│   ├── MainActivity.kt       # 启动界面、遥控器处理、信息展示、重启内核
+│   ├── TVGateService.kt      # 前台服务，常驻运行服务端二进制、网络切换 DNS 自动更新、手动重启
 │   ├── BinaryInstaller.kt    # 从 jniLibs 提取并安装二进制
 │   ├── ConfigParser.kt       # 解析 config.yaml 配置文件
-│   └── NetworkUtils.kt      # 获取设备局域网 IP 地址
+│   └── NetworkUtils.kt      # 获取设备局域网 IP 地址、DNS 服务器
 ├── res/
 │   ├── layout/activity_main.xml   # 启动界面布局
 │   ├── drawable/                   # 图标、卡片背景、焦点样式

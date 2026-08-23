@@ -8,6 +8,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -18,6 +21,7 @@ import android.view.animation.AnimationUtils
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -47,7 +51,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var passwordValue: TextView
     private lateinit var portValue: TextView
     private lateinit var remoteHintCard: LinearLayout
+    private lateinit var btnRestart: Button
     private val handler = Handler(Looper.getMainLooper())
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     // 当前配置（首次启动时 config.yaml 可能还不存在，用默认值）
     private var config: TVGateConfig = TVGateConfig()
@@ -63,6 +69,22 @@ class MainActivity : AppCompatActivity() {
                     ContextCompat.getColor(this@MainActivity, R.color.splash_status_error)
                 )
                 progressBar.visibility = View.GONE
+            }
+        }
+    }
+
+    // 接收内核重启完成通知
+    private val restartReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            handler.post {
+                btnRestart.isEnabled = true
+                btnRestart.text = getString(R.string.btn_restart)
+                Toast.makeText(this@MainActivity, R.string.restart_success, Toast.LENGTH_SHORT).show()
+                // 刷新信息卡片
+                config = ConfigParser.load(this@MainActivity)
+                updateInfoCard()
+                // 重新轮询服务就绪
+                waitForServerReady()
             }
         }
     }
@@ -90,6 +112,7 @@ class MainActivity : AppCompatActivity() {
         passwordValue = findViewById(R.id.passwordValue)
         portValue = findViewById(R.id.portValue)
         remoteHintCard = findViewById(R.id.remoteHintCard)
+        btnRestart = findViewById(R.id.btnRestart)
 
         setupWebView()
         playSplashAnimations()
@@ -124,6 +147,12 @@ class MainActivity : AppCompatActivity() {
             android.content.IntentFilter(TVGateService.ACTION_ERROR),
             receiverFlag
         )
+        // 注册重启完成广播
+        registerReceiver(
+            restartReceiver,
+            android.content.IntentFilter(TVGateService.ACTION_RESTARTED),
+            receiverFlag
+        )
 
         // 启动前台服务跑服务端
         val serviceIntent = Intent(this, TVGateService::class.java)
@@ -145,6 +174,9 @@ class MainActivity : AppCompatActivity() {
         // 轮询等待服务端就绪
         // 在此期间会检测 config.yaml 是否出现，出现后重新读取配置并更新界面
         waitForServerReady()
+
+        // 注册网络变化监听，网络切换时刷新 IP 和二维码
+        registerNetworkCallback()
     }
 
     /**
@@ -193,6 +225,11 @@ class MainActivity : AppCompatActivity() {
                 .setDuration(500)
                 .start()
         }
+
+        // 重启按钮点击事件
+        btnRestart.setOnClickListener {
+            triggerRestart()
+        }
     }
 
     private fun generateQrCode(content: String, sizePx: Int): Bitmap? {
@@ -235,6 +272,19 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         try {
             unregisterReceiver(errorReceiver)
+        } catch (_: Exception) {
+        }
+        try {
+            unregisterReceiver(restartReceiver)
+        } catch (_: Exception) {
+        }
+        // 注销网络监听
+        try {
+            networkCallback?.let {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                cm?.unregisterNetworkCallback(it)
+            }
+            networkCallback = null
         } catch (_: Exception) {
         }
         super.onDestroy()
@@ -321,17 +371,86 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * 注册网络变化监听。
+     * 网络切换时（WiFi → 4G/5G 或反过来），IP 地址会变化，
+     * 需要刷新界面上的 IP、二维码和通知。
+     */
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+
+        try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    capabilities: NetworkCapabilities
+                ) {
+                    handler.post { updateInfoCard() }
+                }
+
+                override fun onLinkPropertiesChanged(
+                    network: Network,
+                    linkProperties: android.net.LinkProperties
+                ) {
+                    handler.post { updateInfoCard() }
+                }
+            }
+            cm.registerNetworkCallback(
+                android.net.NetworkRequest.Builder().build(),
+                callback
+            )
+            networkCallback = callback
+        } catch (_: Exception) {
+        }
+    }
+
+    /**
+     * 触发内核重启。
+     */
+    private fun triggerRestart() {
+        btnRestart.isEnabled = false
+        btnRestart.text = getString(R.string.restart_in_progress)
+        statusText.visibility = View.VISIBLE
+        statusText.text = getString(R.string.restart_in_progress)
+        statusText.setTextColor(
+            ContextCompat.getColor(this, R.color.splash_status_normal)
+        )
+        progressBar.visibility = View.VISIBLE
+
+        val restartIntent = Intent(this, TVGateService::class.java).apply {
+            action = TVGateService.ACTION_RESTART
+        }
+        try {
+            startService(restartIntent)
+        } catch (e: Exception) {
+            btnRestart.isEnabled = true
+            btnRestart.text = getString(R.string.btn_restart)
+            statusText.text = getString(R.string.restart_failed) + ": ${e.localizedMessage}"
+            statusText.setTextColor(
+                ContextCompat.getColor(this, R.color.splash_status_error)
+            )
+            progressBar.visibility = View.GONE
+        }
+    }
+
+    /**
      * 遥控器按键处理：
      * - DPAD 上下/左右：导航焦点（系统默认处理）
-     * - OK/ENTER：复制地址到剪贴板
+     * - OK/ENTER：复制地址到剪贴板（聚焦信息卡片时）或触发重启（聚焦重启按钮时）
      * - BACK：移到后台（不退出）
-     * - MENU：同 OK，复制地址
+     * - MENU：同 OK
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER -> {
-                // 遥控器 OK 键：复制地址
+                // 如果重启按钮聚焦，触发重启
+                if (btnRestart.isFocused && btnRestart.isEnabled) {
+                    triggerRestart()
+                    return true
+                }
+                // 否则：复制地址
                 if (ipCard.visibility == View.VISIBLE) {
                     val ip = NetworkUtils.getLocalIpAddress(this)
                     val url = if (ip != null) config.buildWebUrl(ip) else config.buildLocalUrl()
@@ -340,7 +459,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             KeyEvent.KEYCODE_MENU -> {
-                // 菜单键：同 OK，复制地址
+                // 菜单键：同 OK
+                if (btnRestart.isFocused && btnRestart.isEnabled) {
+                    triggerRestart()
+                    return true
+                }
                 if (ipCard.visibility == View.VISIBLE) {
                     val ip = NetworkUtils.getLocalIpAddress(this)
                     val url = if (ip != null) config.buildWebUrl(ip) else config.buildLocalUrl()

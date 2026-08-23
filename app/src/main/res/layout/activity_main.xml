@@ -249,14 +249,14 @@
 
         </LinearLayout>
 
-        <!-- ===== 遥控器操作提示 ===== -->
+        <!-- ===== 遥控器操作提示 + 重启内核按钮（同一行）===== -->
         <LinearLayout
             android:id="@+id/remoteHintCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:orientation="horizontal"
-            android:gravity="center"
+            android:gravity="center_vertical"
             android:background="@drawable/remote_hint_bg"
             android:padding="10dp"
             android:visibility="gone">
@@ -268,7 +268,7 @@
                 android:textSize="11sp"
                 android:textColor="@color/splash_logo_color"
                 android:textStyle="bold"
-                android:layout_marginEnd="14dp" />
+                android:layout_marginEnd="12dp" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -276,7 +276,7 @@
                 android:text="@string/remote_hint_ok"
                 android:textSize="11sp"
                 android:textColor="@color/splash_ip_hint"
-                android:layout_marginEnd="12dp" />
+                android:layout_marginEnd="10dp" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -284,14 +284,33 @@
                 android:text="@string/remote_hint_back"
                 android:textSize="11sp"
                 android:textColor="@color/splash_ip_hint"
-                android:layout_marginEnd="12dp" />
+                android:layout_marginEnd="10dp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/remote_hint_dpad"
                 android:textSize="11sp"
-                android:textColor="@color/splash_ip_hint" />
+                android:textColor="@color/splash_ip_hint"
+                android:layout_marginEnd="12dp" />
+
+            <!-- 重启内核按钮 -->
+            <Button
+                android:id="@+id/btnRestart"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_restart"
+                android:textSize="12sp"
+                android:textColor="@color/splash_logo_color"
+                android:background="@drawable/btn_restart_bg"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:clickable="true"
+                android:focusable="true" />
 
         </LinearLayout>
 

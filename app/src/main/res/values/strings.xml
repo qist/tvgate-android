@@ -27,6 +27,12 @@
     <string name="remote_hint_menu">菜单键:同 OK</string>
     <string name="remote_hint_dpad">方向键:切换焦点</string>
 
+    <!-- 手动重启按钮 -->
+    <string name="btn_restart">重启内核</string>
+    <string name="restart_in_progress">正在重启内核…</string>
+    <string name="restart_success">内核已重启</string>
+    <string name="restart_failed">重启失败</string>
+
     <!-- 前台通知文案 -->
     <string name="notif_running_title">TVGate 运行中</string>
     <string name="notif_running_text">本地转发服务已启动 · 127.0.0.1:8888</string>
