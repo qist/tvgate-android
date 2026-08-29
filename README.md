@@ -35,6 +35,20 @@
 - 通知栏显示持久通知，包含**局域网访问地址和端口**
 - 通知提供「停止服务」和「打开」操作按钮
 - 按返回键时 App 移到后台运行，不会退出
+- 前台服务使用 `specialUse` 类型（Android 15 起禁止从开机广播启动
+  `dataSync` 类型，`specialUse` 无类型时限、允许开机自启）
+
+### 开机自启
+
+设备重启后自动启动 TVGate 服务，无需手动打开 App：
+
+- 注册 `BOOT_COMPLETED` 广播接收器 `BootReceiver`
+- 重启后自动以 `startForegroundService` 拉起前台服务
+- 适用机顶盒/电视盒子"开机即用"场景
+
+> **注意**：部分 ROM（如某些模拟器/盒子固件）有"自启动管理"策略，
+> 默认拦截第三方应用的开机广播。若重启后未自动启动，请在系统设置中
+> 允许 TVGate 自启动；被"强制停止"过的应用也需先手动打开一次。
 
 ### 局域网信息展示
 
@@ -121,6 +135,10 @@ App 会检测配置文件出现后自动重新读取并更新界面。
 > armv7 / x86_64 需要 quic-go 的 cgo，脚本会自动用 Android NDK 的 clang
 > 作为 C 交叉编译器（`CGO_ENABLED=1`）。
 
+**体积优化**：`build-android.sh` 已叠加裁剪参数 `-trimpath`
+`-gcflags=all=-l`（关闭 Go 函数内联，减少代码膨胀）`-ldflags="-s -w"`
+（剥离符号与调试信息），单架构二进制可省约 1.6MB。APK 约 12MB/架构。
+
 ### 2. 构建并签名 APK
 
 ```bash
@@ -202,6 +220,14 @@ web:
 修改 `config.yaml` 后重启 App 即可生效。App 会自动读取最新配置并更新
 界面显示的端口、账号、密码和二维码。
 
+### PHP 脚本目录（docroot）
+
+PHP 模块默认 `docroot: www`（相对路径），以**配置文件所在目录**为基准，
+即解析为 `files/` 目录下的 `www/`。App 启动时会自动确保
+`files/www` 目录存在，可直接在 Web 管理界面的「代码」页上传/编辑
+`.php` 脚本（支持重命名、批量替换、查找替换等）。脚本内的相对路径
+文件操作（如 `file_put_contents('json/xxx.json')`）也以脚本目录为基准。
+
 ### DNS 配置
 
 #### 自动注入（默认行为）
@@ -282,6 +308,7 @@ app/src/main/
 ├── java/com/tvgate/app/
 │   ├── MainActivity.kt       # 启动界面、遥控器处理、信息展示、重启内核
 │   ├── TVGateService.kt      # 前台服务，常驻运行服务端二进制、网络切换 DNS 自动更新、手动重启
+│   ├── BootReceiver.kt       # 开机自启广播接收器（BOOT_COMPLETED）
 │   ├── BinaryInstaller.kt    # 从 jniLibs 提取并安装二进制
 │   ├── ConfigParser.kt       # 解析 config.yaml 配置文件
 │   └── NetworkUtils.kt      # 获取设备局域网 IP 地址、DNS 服务器

@@ -79,6 +79,15 @@ class TVGateService : Service() {
         try {
             val configPath = File(filesDir, "config.yaml").absolutePath
 
+            // 兜底：确保 PHP docroot 目录（config.yaml 默认相对路径 www）
+            // 存在。相对路径 www 会按配置文件所在目录解析，即 filesDir/www，
+            // 属 App 私有可写目录，提前建好可避免目录缺失/不可写问题。
+            try {
+                File(filesDir, "www").mkdirs()
+            } catch (e: Exception) {
+                Log.w(TAG, "create docroot dir failed: ${e.message}")
+            }
+
             // 第一次启动：让二进制生成默认 config.yaml（如果不存在）
             val configFile = File(filesDir, "config.yaml")
             val needDnsInject = !configFile.exists() || !hasDnsConfig(configFile)

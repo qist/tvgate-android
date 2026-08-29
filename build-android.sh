@@ -80,8 +80,10 @@ build_one() {
   local envs=(GOOS=android GOARCH="$goarch" CGO_ENABLED=1 CC="$CLANG_DIR/$cc")
   if [ -n "$goarm" ]; then envs+=(GOARM="$goarm"); fi
 
+  # -gcflags=all=-l 关闭函数内联，减少代码膨胀（Go 内联会复制函数体，明显增加体积）；
+  # 对代理场景性能影响可忽略。与 -trimpath / -ldflags="-s -w" 叠加裁剪。
   ( cd "$TVGATE_SRC" && env "${envs[@]}" \
-      go build -trimpath -ldflags="-s -w" -o "$out" . )
+      go build -trimpath -gcflags=all=-l -ldflags="-s -w" -o "$out" . )
   echo "    -> $out ($(du -h "$out" | cut -f1))"
 }
 

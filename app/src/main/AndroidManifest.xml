@@ -13,10 +13,12 @@
         android:maxSdkVersion="32" />
     <!-- 阻止系统把 App 休眠，保证后台转发 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Android 14+ 要求前台服务声明具体类型权限 -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Android 15 禁止从 BOOT_COMPLETED 启动 dataSync 类型前台服务，改用 specialUse（无类型时限、允许开机启动） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- Android 13+ 需要运行时申请通知权限，前台服务才能显示通知 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 开机自启：设备重启后自动启动前台服务 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
@@ -43,6 +45,21 @@
         <service
             android:name=".TVGateService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="specialUse">
+            <!-- specialUse 类型要求声明用途子类型（Android 14+ 校验） -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="IPTV proxy long-running server" />
+        </service>
+
+        <!-- 开机自启接收器：设备重启后自动启动 TVGate 服务 -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
