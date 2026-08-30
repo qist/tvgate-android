@@ -248,10 +248,11 @@ PHP 模块默认 `docroot: www`（相对路径），以**配置文件所在目�
 sync:
   - name: tvbox               # 标识（用于日志区分多仓库，可空）
     enabled: true             # 是否启用
-    type: github              # github | gitlab
+    type: github              # github | gitlab | gitee
+    host: ""                  # 自建实例地址（自建 GitLab https://git.内网 或 Gitee https://gitee.com），留空 = 平台默认
     repo: qist/tvbox          # 仓库 owner/repo
     branch: master            # 同步分支
-    token: ""                 # PAT（GitHub: ghp_xxx；GitLab: glpat_xxx），公开仓库可留空
+    token: ""                 # PAT（GitHub: ghp_xxx；GitLab: glpat_xxx；Gitee: 私人令牌），公开仓库可留空
     interval: 60s             # 轮询间隔（最小 10s）
     repo_path: .              # 仓库内源子目录（"." = 仓库根）
     local_path: tvbox         # 本地目标：以 php docroot 为锚点；"tvbox" = docroot/tvbox
