@@ -228,6 +228,42 @@ PHP 模块默认 `docroot: www`（相对路径），以**配置文件所在目�
 `.php` 脚本（支持重命名、批量替换、查找替换等）。脚本内的相对路径
 文件操作（如 `file_put_contents('json/xxx.json')`）也以脚本目录为基准。
 
+### 仓库同步（sync，v3.0.8+）
+
+内嵌的 TVGate 服务端支持**仓库同步**：把 GitHub / GitLab 仓库内容**单向**
+同步到设备本地 `docroot/tvbox`（即 `files/www/tvbox`），一处维护、多端
+自动拉取，无需 git。适合同步 TVBox 订阅配置 / 直播源 / 爬虫插件等混合内容。
+
+- **配置**：编辑 `config.yaml` 的 `sync` 段（支持多仓库），或登录 Web 管理界面
+  `http://<IP>:8888/web/sync-editor` 可视化增删仓库
+- **访问**：同步到 `files/www/tvbox`，通过 `http://<IP>:8888/php/tvbox/<文件>`
+  直接访问（如 `0707.json`、`listx.m3u`、`jar/spider.jar`），可作为 TVBox 订阅地址
+- **多仓库**：`sync` 为条目列表，每项独立同步循环、独立 manifest；条目需使用互不相同的 `local_path`
+- **protect 保护清单**：设备私有文件（如 `tv.txt`）加入后**永不覆盖、永不删除**
+- **整仓归档**：公开仓库走 codeload 直连，不占 GitHub API 未认证 60 次/小时限额；
+  首次同步或 API 限流时自动降级整仓归档，避免大仓库逐文件拉取触发 429/403
+- **令牌安全**：Web 编辑器保存后令牌以 `********` 显示、**不回显**，填新值才覆盖
+
+```yaml
+sync:
+  - name: tvbox               # 标识（用于日志区分多仓库，可空）
+    enabled: true             # 是否启用
+    type: github              # github | gitlab
+    repo: qist/tvbox          # 仓库 owner/repo
+    branch: master            # 同步分支
+    token: ""                 # PAT（GitHub: ghp_xxx；GitLab: glpat_xxx），公开仓库可留空
+    interval: 60s             # 轮询间隔（最小 10s）
+    repo_path: .              # 仓库内源子目录（"." = 仓库根）
+    local_path: tvbox         # 本地目标：以 php docroot 为锚点；"tvbox" = docroot/tvbox
+    only_php: false           # 是否只同步 PHP 文件（混合内容默认 false 全量）
+    backup: true              # 覆盖/删除前备份为 .bak.<时间戳>
+    delete: false             # 远端已删除的文件，本地是否也删除
+    protect: []               # 本地保护清单（相对 local_path，支持目录前缀）：永不覆盖、永不删除
+    timeout: 15s              # 单次 API/下载请求超时
+```
+
+> 详细设计见 [tvgate 服务端 doc/sync-dev.md](https://github.com/qist/tvgate/blob/main/doc/sync-dev.md)。
+
 ### DNS 配置
 
 #### 自动注入（默认行为）
