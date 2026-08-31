@@ -69,7 +69,7 @@ App 从 `config.yaml` 读取以下配置并实时更新界面：
 | `web.username` | Web 管理界面账号 | `admin` |
 | `web.password` | Web 管理界面密码 | `admin` |
 | `web.path` | Web 管理界面路径 | `/web/` |
-| `dns.servers` | DNS 服务器列表 | 自动获取设备 DNS |
+| `dns.servers` | DNS 服务器列表 | 不配置，默认走系统/本地 DNS |
 
 首次启动时 `config.yaml` 可能不存在，TVGate 二进制启动后会自动生成默认配置，
 App 会检测配置文件出现后自动重新读取并更新界面。
@@ -267,45 +267,26 @@ sync:
 
 ### DNS 配置
 
-#### 自动注入（默认行为）
+#### 默认行为：走系统/本地 DNS（无需注入）
 
-Android 系统没有本地 DNS 服务（`[::1]:53` 不存在），Go 标准库的
-`net.Resolver` 在 `PreferGo=true` 模式下会尝试连接本地 DNS，导致域名解析
-失败，表现为 m3u8 等远程资源返回 **Bad Gateway** 或 **502** 错误。
+App **默认不做任何 DNS 注入**，域名解析交给 tvgate 服务端的 DNS 兜底链：
 
-App 会在首次启动时**自动检测** `config.yaml` 中是否已有 `dns.servers`
-配置：
+- 服务端移除了 `PreferGo`，且安卓包为 **CGO 链接**（`libc.so`），系统解析会经
+  libc `getaddrinfo` → Android **netd** → 设备当前活动网络的本地 DNS
+  （路由器 DHCP 下发），因此公网与内网域名都能解析，m3u8 等远程资源正常返回。
+- 兜底顺序统一为：**手动配置的 `dns.servers` → 系统/本地 DNS → 内置公共 DNS
+  （`223.5.5.5` / `119.29.29.29`）**。配置的 DNS 只在它真正成功时生效。
 
-- **没有 DNS 配置** → 自动获取设备当前使用的 DNS 服务器（通过
-  `ConnectivityManager` 读取系统 DNS），注入 `config.yaml`，然后重启
-  TVGate 进程使配置生效。
-- **已有 DNS 配置** → 跳过注入，直接使用用户手动配置的 DNS。
+> 较旧版本曾通过 App 首次启动/网络切换时把设备 DNS 自动注入 `config.yaml`
+> 并重启进程来解决早期纯 Go 解析失败的问题。当前版本已**关闭该自动注入**
+> （`TVGateService.kt` 中相关代码整块注释保留），不再需要——默认即走本地 DNS。
+> 若后续遇到回归，可恢复注释后再评估是否彻底移除。
 
-#### 网络环境切换自动适配
+#### 手动配置 DNS（可选，优先级最高）
 
-当设备网络环境发生变化时（例如从家里 WiFi 切换到外出 4G/5G，或
-反过来），DNS 服务器和本机 IP 地址都会改变。App 会自动处理：
-
-1. **DNS 自动更新**（仅自动注入模式）：
-   - App 注册了 `ConnectivityManager.NetworkCallback`，实时监听网络变化
-   - 网络切换后，自动获取新网络的 DNS 服务器
-   - 如果新 DNS 与当前配置不同，自动更新 `config.yaml` 并重启 TVGate 进程
-   - **用户手动配置的 DNS 不会被覆盖**——只有自动注入的 DNS 才会更新
-
-2. **界面信息刷新**：
-   - 网络切换后，界面上的 IP 地址、访问二维码会自动刷新
-   - 无需手动重启 App
-
-3. **手动配置 DNS 的行为**：
-   - 如果用户手动配置了 `dns.servers`（非自动注入），网络切换时 **不会** 被覆盖
-   - 适用于固定使用公共 DNS（如 `223.5.5.5`）的场景
-   - 如需恢复自动适配，删除 `config.yaml` 中的 `dns` 段并重启 App
-
-#### 手动配置 DNS
-
-如果自动注入的 DNS 不满足需求（例如需要使用公共 DNS、自定义 DNS 或
-DoH/DoT 服务器），可以手动编辑 `config.yaml`，在 `dns` 段指定 DNS 服务器
-列表：
+默认走系统/本地 DNS 已够用；若需要固定使用指定 DNS（如公共 DNS、自定义 DNS
+或 DoH/DoT 服务器），可手动编辑 `config.yaml`，在 `dns` 段指定服务器列表。
+配置后该列表**强制优先**使用，仅当其失败时才回落系统/本地 DNS：
 
 ```yaml
 server:
@@ -330,13 +311,7 @@ dns:
 |---|---|---|
 | `dns.timeout` | 单次 DNS 查询超时时间 | `5s` |
 | `dns.max_conns` | DNS 连接池大小 | `10` |
-| `dns.servers` | DNS 服务器列表（IPv4 地址） | 自动获取设备 DNS |
-
-> **提示**：手动配置 DNS 后，App 不会再自动覆盖。如需恢复自动注入，
-> 删除 `config.yaml` 中的 `dns` 段并重启 App 即可。
-
-> **网络切换**：使用自动注入 DNS 时，网络环境变化（WiFi → 4G/5G）
-> 会自动更新 DNS 并重启服务。手动配置的 DNS 不受影响。
+| `dns.servers` | DNS 服务器列表（IPv4 地址） | 不配置时走系统/本地 DNS |
 
 ## 项目结构
 
@@ -344,7 +319,7 @@ dns:
 app/src/main/
 ├── java/com/tvgate/app/
 │   ├── MainActivity.kt       # 启动界面、遥控器处理、信息展示、重启内核
-│   ├── TVGateService.kt      # 前台服务，常驻运行服务端二进制、网络切换 DNS 自动更新、手动重启
+│   ├── TVGateService.kt      # 前台服务，常驻运行服务端二进制、手动重启（DNS 自动注入已注释停用）
 │   ├── BootReceiver.kt       # 开机自启广播接收器（BOOT_COMPLETED）
 │   ├── BinaryInstaller.kt    # 从 jniLibs 提取并安装二进制
 │   ├── ConfigParser.kt       # 解析 config.yaml 配置文件

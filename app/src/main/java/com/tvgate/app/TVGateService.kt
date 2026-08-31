@@ -40,7 +40,8 @@ class TVGateService : Service() {
         const val ACTION_RESTART = "com.tvgate.app.RESTART"
         const val ACTION_RESTARTED = "com.tvgate.app.RESTARTED"
         private const val CHANNEL_ID = "tvgate_foreground"
-        private const val AUTO_DNS_MARKER = "# --- Android 自动注入 DNS 配置 ---"
+        // 【已注释保留】DNS 自动注入标记常量
+        // private const val AUTO_DNS_MARKER = "# --- Android 自动注入 DNS 配置 ---"
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -69,8 +70,8 @@ class TVGateService : Service() {
             Thread { runServer() }.start()
         }
 
-        // 注册网络变化监听，网络切换时自动更新 DNS
-        registerNetworkCallback()
+        // 【已注释保留】DNS 自动注入：注册网络变化监听。默认走系统/本地 DNS，无需注入。
+        // registerNetworkCallback()
 
         return START_STICKY
     }
@@ -89,8 +90,9 @@ class TVGateService : Service() {
             }
 
             // 第一次启动：让二进制生成默认 config.yaml（如果不存在）
-            val configFile = File(filesDir, "config.yaml")
-            val needDnsInject = !configFile.exists() || !hasDnsConfig(configFile)
+            // 【已注释保留】DNS 自动注入：不再需要检测/注入配置
+            // val configFile = File(filesDir, "config.yaml")
+            // val needDnsInject = !configFile.exists() || !hasDnsConfig(configFile)
 
             // 启动二进制
             launchProcess(configPath)
@@ -154,6 +156,7 @@ class TVGateService : Service() {
         return false
     }
 
+    /* ============ [已注释保留] DNS 自动注入实现（整块注释，便于问题恢复；稳定一个大版本后再清理）============
     /**
      * 注册网络变化监听。
      * 当网络切换时（WiFi → 4G/5G 或反过来），自动检测 DNS 是否变化，
@@ -390,6 +393,7 @@ class TVGateService : Service() {
             Log.e(TAG, "injectDnsConfig failed", e)
         }
     }
+    */
 
     /**
      * 手动重启 TVGate 内核进程。
