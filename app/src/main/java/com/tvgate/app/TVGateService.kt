@@ -96,9 +96,10 @@ class TVGateService : Service() {
             launchProcess(configPath)
 
             // 如果需要注入 DNS，等待 config.yaml 出现后注入，然后重启
-            if (needDnsInject) {
-                ensureDnsAndRestart(configPath)
-            }
+            // 【测试】临时注释：关闭自动注入 DNS，改用域名解析走系统/公共DNS兜底
+            // if (needDnsInject) {
+            //     ensureDnsAndRestart(configPath)
+            // }
 
             // 等待当前进程退出
             val proc = process
@@ -172,7 +173,8 @@ class TVGateService : Service() {
                 ) {
                     // 网络能力变化（如 WiFi → 蜂窝），可能伴随 DNS 变化
                     Log.i(TAG, "network capabilities changed, checking DNS...")
-                    handleNetworkChange()
+                    // 【测试】临时注释：关闭网络变化时的自动 DNS 注入/重启
+                    // handleNetworkChange()
                 }
 
                 override fun onLinkPropertiesChanged(
@@ -181,7 +183,8 @@ class TVGateService : Service() {
                 ) {
                     // LinkProperties 变化（包括 DNS 服务器变化）
                     Log.i(TAG, "link properties changed, checking DNS...")
-                    handleNetworkChange()
+                    // 【测试】临时注释：关闭网络变化时的自动 DNS 注入/重启
+                    // handleNetworkChange()
                 }
             }
             cm.registerNetworkCallback(

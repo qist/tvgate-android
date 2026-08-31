@@ -71,21 +71,22 @@ jobs:
           echo "version=$TVGATE_VERSION" >> "$GITHUB_OUTPUT"
           echo "TVGate version: $TVGATE_VERSION"
 
-      - name: Create Release and Upload APKs
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.version }}
-          name: ${{ steps.version.outputs.version }}
-          prerelease: false
-          body: |
-            TVGate Android APK ${{ steps.version.outputs.version }}
-
-            - arm64-v8a (64位 ARM，主流设备)
-            - armeabi-v7a (32位 ARM，老设备)
-            - x86_64 (模拟器 / Chromebox)
-          files: |
-            TVGate-${{ steps.version.outputs.version }}-arm64.apk
-            TVGate-${{ steps.version.outputs.version }}-arm.apk
-            TVGate-${{ steps.version.outputs.version }}-x86_64.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 【测试】临时注释：不上传 releases、不创建 release tag
+      # - name: Create Release and Upload APKs
+      #   uses: softprops/action-gh-release@v2
+      #   with:
+      #     tag_name: ${{ steps.version.outputs.version }}
+      #     name: ${{ steps.version.outputs.version }}
+      #     prerelease: false
+      #     body: |
+      #       TVGate Android APK ${{ steps.version.outputs.version }}
+      #
+      #       - arm64-v8a (64位 ARM，主流设备)
+      #       - armeabi-v7a (32位 ARM，老设备)
+      #       - x86_64 (模拟器 / Chromebox)
+      #   files: |
+      #     TVGate-${{ steps.version.outputs.version }}-arm64.apk
+      #     TVGate-${{ steps.version.outputs.version }}-arm.apk
+      #     TVGate-${{ steps.version.outputs.version }}-x86_64.apk
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
