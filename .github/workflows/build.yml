@@ -71,6 +71,17 @@ jobs:
           echo "version=$TVGATE_VERSION" >> "$GITHUB_OUTPUT"
           echo "TVGate version: $TVGATE_VERSION"
 
+      # 【测试】构建产物以 workflow artifact 形式供下载（不创建 release / 不上传 releases）
+      - name: Upload APKs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TVGate-${{ steps.version.outputs.version }}-test
+          path: |
+            TVGate-${{ steps.version.outputs.version }}-arm64.apk
+            TVGate-${{ steps.version.outputs.version }}-arm.apk
+            TVGate-${{ steps.version.outputs.version }}-x86_64.apk
+          if-no-files-found: error
+
       # 【测试】临时注释：不上传 releases、不创建 release tag
       # - name: Create Release and Upload APKs
       #   uses: softprops/action-gh-release@v2
