@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 在线更新的 APK 下载到 getFilesDir()/updates/，通过 FileProvider 暴露给系统安装器 -->
+<paths>
+    <files-path
+        name="updates"
+        path="updates/" />
+</paths>

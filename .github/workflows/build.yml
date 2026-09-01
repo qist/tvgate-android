@@ -5,9 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -71,19 +68,14 @@ jobs:
           echo "version=$TVGATE_VERSION" >> "$GITHUB_OUTPUT"
           echo "TVGate version: $TVGATE_VERSION"
 
-      - name: Create Release and Upload APKs
-        uses: softprops/action-gh-release@v2
+      # 不创建 GitHub Release，改用 Actions artifact 留存 APK，
+      # 下载入口：Actions 页面 → 本次构建 → Artifacts → tvgate-apks
+      - name: Upload APKs as artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ steps.version.outputs.version }}
-          name: ${{ steps.version.outputs.version }}
-          prerelease: false
-          body: |
-            TVGate Android APK ${{ steps.version.outputs.version }}
-
-            - arm64-v8a (64位 ARM，主流设备)
-            - armeabi-v7a (32位 ARM，老设备)
-            - x86_64 (模拟器 / Chromebox)
-          files: |
+          name: tvgate-apks-${{ steps.version.outputs.version }}
+          path: |
             TVGate-${{ steps.version.outputs.version }}-arm64.apk
             TVGate-${{ steps.version.outputs.version }}-arm.apk
             TVGate-${{ steps.version.outputs.version }}-x86_64.apk
+          if-no-files-found: error

@@ -12,10 +12,12 @@ import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.DisplayMetrics
 import android.util.TypedValue
 import android.view.KeyEvent
@@ -33,6 +35,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
@@ -197,6 +201,9 @@ class MainActivity : AppCompatActivity() {
 
         // 注册网络变化监听，网络切换时刷新 IP 和二维码
         registerNetworkCallback()
+
+        // 在线更新检测：无网络时自动跳过，不影响其他功能
+        checkForUpdate()
     }
 
     /**
@@ -655,6 +662,122 @@ class MainActivity : AppCompatActivity() {
             webView.goBack()
         } else {
             moveTaskToBack(true)
+        }
+    }
+
+    // ==================== 在线 APK 更新 ====================
+
+    /**
+     * 静默检查更新：对比 GitHub Latest 版本与本地版本。
+     * - 网络不通：AppUpdater 内部跳过验证（本地版本优于远程，直接忽略）。
+     * - 有新版：弹出更新对话框。
+     */
+    private fun checkForUpdate() {
+        AppUpdater.checkUpdate(this) { info ->
+            if (info == null) return@checkUpdate
+            showUpdateDialog(info)
+        }
+    }
+
+    private fun showUpdateDialog(info: AppUpdater.UpdateInfo) {
+        val local = AppUpdater.localVersion(this)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.update_dialog_title)
+            .setMessage(getString(R.string.update_dialog_message, info.version, local))
+            .setPositiveButton(R.string.update_positive) { _, _ ->
+                startUpdateDownload(info)
+            }
+            .setNegativeButton(R.string.update_negative, null)
+            .setCancelable(true)
+            .show()
+    }
+
+    /**
+     * 后台下载新版 APK 并展示下载进度，完成后交给系统安装器。
+     */
+    private fun startUpdateDownload(info: AppUpdater.UpdateInfo) {
+        // 用程序化布局实现“进度文字 + 横向进度条”的下载对话框
+        val paddingDp = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, 24f, resources.displayMetrics
+        ).toInt()
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(paddingDp, paddingDp, paddingDp, 0)
+        }
+        val progressLabel = TextView(this).apply {
+            text = getString(R.string.update_downloading, 0)
+            textSize = 13f
+        }
+        val progressBar = ProgressBar(
+            this, null, android.R.attr.progressBarStyleHorizontal
+        ).apply {
+            max = 100
+            progress = 0
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 12 }
+        }
+        column.addView(progressLabel)
+        column.addView(progressBar)
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.update_dialog_title)
+            .setView(column)
+            .setCancelable(false)
+            .create()
+        dialog.show()
+
+        Thread {
+            val file = AppUpdater.downloadApk(this, info.apkUrl, info.apkName) { percent ->
+                runOnUiThread {
+                    progressLabel.text = getString(R.string.update_downloading, percent)
+                    progressBar.progress = percent
+                }
+            }
+            runOnUiThread {
+                dialog.dismiss()
+                if (file != null) {
+                    installApk(file)
+                } else {
+                    Toast.makeText(
+                        this, R.string.update_download_failed, Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }.start()
+    }
+
+    /**
+     * 通过系统安装器安装新版 APK（FileProvider 授予临时读取权限）。
+     */
+    private fun installApk(file: File) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            Toast.makeText(
+                this, R.string.update_install_src_forbidden, Toast.LENGTH_LONG
+            ).show()
+            // 引导用户开启“允许安装未知来源”
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            } catch (_: Exception) {
+            }
+            return
+        }
+
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, R.string.update_install_src_forbidden, Toast.LENGTH_LONG).show()
         }
     }
 }
