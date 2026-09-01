@@ -104,6 +104,19 @@ App 会检测配置文件出现后自动重新读取并更新界面。
 
 > 重启仅影响内核进程，前台服务和通知不受影响。
 
+### 在线 APK 更新
+
+App 启动时自动检查 GitHub 最新 Release 版本，与本地安装版本对比：
+
+- 调用 `GET /repos/{owner}/{repo}/releases/latest` 获取最新发布版与 APK 资源
+- **本地版本更低** → 弹出「发现新版本」对话框，用户确认后下载并交给系统安装器安装
+- 按当前设备 ABI（arm64 / arm / x86_64）自动匹配对应 APK 资源
+- **网络不可用时自动跳过**更新检查，不影响本地转发服务与正常使用
+- 升级为覆盖安装：包名与签名一致时，已授权权限与应用数据自动保留
+
+实现见 `AppUpdater.kt`（网络检测、拉取、版本对比、按 ABI 找资源、下载）与
+`MainActivity.kt`（检查、弹窗、下载进度、FileProvider 安装）。
+
 ## 构建
 
 本仓库包含完整构建链：`build-android.sh` 交叉编译 Go 服务端为 `.so`，
@@ -174,7 +187,8 @@ Build → Build Bundle(s) / APK(s) → Build APK(s)
 ## GitHub Actions 自动构建
 
 仓库已配置 `.github/workflows/build.yml`：push 到 `main` 或手动触发后，
-CI 会自动完成「clone 服务端源码 → 交叉编译 → 分架构打包 → 签名 → 上传产物」。
+CI 会自动完成「clone 服务端源码 → 交叉编译 → 分架构打包 → 签名 → 上传 artifact
+→ 创建 GitHub Release」。
 
 ### 需要配置的 Secrets（仓库 Settings → Secrets and variables → Actions）
 
@@ -184,10 +198,17 @@ CI 会自动完成「clone 服务端源码 → 交叉编译 → 分架构打包 
 | `TVGATE_KS_PASS` | 密钥密码 |
 
 密钥别名 CI 默认 `tvgate`（workflow 中 `env.TVGATE_KS_ALIAS` 可改）。
-构建完成后在 Actions 页面下载 `tvgate-apks` artifact。
+构建完成后会自动创建/更新对应版本的 GitHub **Release**（App 在线更新即依赖它），
+APK 同时以 `tvgate-apks-<版本>` artifact 存留，可在 Actions 页面下载。
 
 > 若 `qist/tvgate` 为私有仓库，请把 workflow 里的 clone 地址改为带凭据的
 > URL（凭据存为另一个 Secret）。
+
+### 手动触发 / 覆盖版本号
+
+`Actions → Build APK → Run workflow` 时可填 `version` 覆盖 APK 版本号
+（默认用 tvgate 源码 `config/version`）。在线更新测试时，可据此用一个更高版本
+打包：旧版 App 打开会检测到 `releases/latest` 更高版本并提示下载更新。
 
 ## 工作原理
 
@@ -318,11 +339,12 @@ dns:
 ```
 app/src/main/
 ├── java/com/tvgate/app/
-│   ├── MainActivity.kt       # 启动界面、遥控器处理、信息展示、重启内核
+│   ├── MainActivity.kt       # 启动界面、遥控器处理、信息展示、重启内核、在线更新
 │   ├── TVGateService.kt      # 前台服务，常驻运行服务端二进制、手动重启（DNS 自动注入已注释停用）
 │   ├── BootReceiver.kt       # 开机自启广播接收器（BOOT_COMPLETED）
 │   ├── BinaryInstaller.kt    # 从 jniLibs 提取并安装二进制
 │   ├── ConfigParser.kt       # 解析 config.yaml 配置文件
+│   ├── AppUpdater.kt        # 在线 APK 更新：网络检测、GitHub 版本对比、按 ABI 下载
 │   └── NetworkUtils.kt      # 获取设备局域网 IP 地址、DNS 服务器
 ├── res/
 │   ├── layout/activity_main.xml   # 启动界面布局
