@@ -66,9 +66,9 @@ object AppUpdater {
     fun localVersion(context: Context): String {
         return try {
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            info.versionName ?: BuildConfig.VERSION_NAME
+            (info.versionName ?: BuildConfig.VERSION_NAME).removePrefix("v")
         } catch (_: PackageManager.NameNotFoundException) {
-            BuildConfig.VERSION_NAME
+            BuildConfig.VERSION_NAME.removePrefix("v")
         }
     }
 
