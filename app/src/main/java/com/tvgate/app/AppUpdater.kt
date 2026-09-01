@@ -107,10 +107,13 @@ object AppUpdater {
                         // 当前架构发行版没有对应 APK 时也要跳过
                         val short = abiShortName()
                         if (short != null) {
-                            val apkName = "TVGate-${remote.version}-$short.apk"
-                            val assetUrl = findAssetUrl(remote.json, apkName)
-                            if (assetUrl != null) {
-                                info = UpdateInfo(remote.version, apkName, assetUrl)
+                            // 允许资源名带或不带 "v" 前缀（如 TVGate-3.11.0-arm64.apk / TVGate-v3.11.0-arm64.apk）
+                            val apkName = findAssetName(remote.json, remote.version, short)
+                            if (apkName != null) {
+                                val assetUrl = findAssetUrl(remote.json, apkName)
+                                if (assetUrl != null) {
+                                    info = UpdateInfo(remote.version, apkName, assetUrl)
+                                }
                             }
                         }
                     }
@@ -144,6 +147,24 @@ object AppUpdater {
         }
     }
 
+    /**
+     * 在发布资产中查找与版本、ABI 匹配的 APK 文件名。
+     * 兼容资源名带 / 不带 "v" 前缀，找到则返回实际资源名，未找到返回 null。
+     */
+    private fun findAssetName(json: JSONObject, version: String, abiShort: String): String? {
+        val candidates = setOf(
+            "TVGate-$version-$abiShort.apk",
+            "TVGate-v$version-$abiShort.apk"
+        )
+        val assets = json.optJSONArray("assets") ?: return null
+        for (i in 0 until assets.length()) {
+            val name = assets.getJSONObject(i).optString("name")
+            if (name in candidates) return name
+        }
+        return null
+    }
+
+    /** 在发布资产中按文件名查找其下载地址（browser_download_url）。 */
     private fun findAssetUrl(json: JSONObject, apkName: String): String? {
         val assets = json.optJSONArray("assets") ?: return null
         for (i in 0 until assets.length()) {
