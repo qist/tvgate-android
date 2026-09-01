@@ -4,6 +4,10 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      version:
+        description: '覆盖 APK 版本号（如 3.11.0），留空则用 tvgate 源码 config/version'
+        required: false
 
 jobs:
   build:
@@ -58,13 +62,18 @@ jobs:
         env:
           TVGATE_KS_PASS: ${{ secrets.TVGATE_KS_PASS }}
           TVGATE_SRC: /tmp/tvgate
+          TVGATE_VERSION: ${{ inputs.version }}
         run: |
           ./build-android-split.sh
 
       - name: Read TVGate version
         id: version
         run: |
-          TVGATE_VERSION=$(tr -d '[:space:]' < /tmp/tvgate/config/version)
+          if [ -n "${{ inputs.version }}" ]; then
+            TVGATE_VERSION="${{ inputs.version }}"
+          else
+            TVGATE_VERSION=$(tr -d '[:space:]' < /tmp/tvgate/config/version)
+          fi
           echo "version=$TVGATE_VERSION" >> "$GITHUB_OUTPUT"
           echo "TVGate version: $TVGATE_VERSION"
 

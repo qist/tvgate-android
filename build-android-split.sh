@@ -42,13 +42,19 @@ fi
 export TVGATE_SRC="${TVGATE_SRC:-$(cd "$ROOT/../tvgate" 2>/dev/null && pwd)}"
 
 # ---- 读取 TVGate 版本号（与 tvgate 仓库 tag 一致） ----
-VERSION_FILE="$TVGATE_SRC/config/version"
-if [ ! -f "$VERSION_FILE" ]; then
-  echo "ERROR: 找不到版本文件 $VERSION_FILE" >&2
-  exit 1
+# 若外部已通过环境变量提供 TVGATE_VERSION（例如手动触发 CI 覆盖版本做更新测试），
+# 则以环境变量为准；否则从 tvgate 源码 config/version 读取。
+if [ -n "${TVGATE_VERSION:-}" ]; then
+  echo "Override TVGate version: $TVGATE_VERSION"
+else
+  VERSION_FILE="$TVGATE_SRC/config/version"
+  if [ ! -f "$VERSION_FILE" ]; then
+    echo "ERROR: 找不到版本文件 $VERSION_FILE" >&2
+    exit 1
+  fi
+  TVGATE_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+  echo "TVGate version: $TVGATE_VERSION"
 fi
-TVGATE_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
-echo "TVGate version: $TVGATE_VERSION"
 export TVGATE_VERSION
 
 ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}"
