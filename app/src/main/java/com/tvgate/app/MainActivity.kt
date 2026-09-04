@@ -73,6 +73,7 @@ class MainActivity : AppCompatActivity() {
     private var playerDismissedByUser = false  // 用户按返回退出后，本次会话不再自动打开
     private var playerOpenHintShown = false    // “按返回键回到主页”提示只弹一次
     private var fullscreenView: View? = null   // HTML5 全屏视频容器
+    private var fullscreenCallback: android.webkit.WebChromeClient.CustomViewCallback? = null
 
     // 当前配置（首次启动时 config.yaml 可能还不存在，用默认值）
     private var config: TVGateConfig = TVGateConfig()
@@ -456,11 +457,14 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 服务就绪后按配置决定是否自动打开直播接口。
-     * 仅在 config.yaml 中 player.enabled: true 时打开；
+     * 需同时满足：config.yaml 中 player.enabled: true，
+     * 且 player.android_autoplay 未显式设为 false；
      * 用户按返回键退出后，本次会话不再自动打开。
      */
     private fun maybeOpenLivePlayer() {
-        if (!config.playerEnabled || playerVisible || playerDismissedByUser) return
+        if (!config.playerEnabled || config.androidAutoplay == false ||
+            playerVisible || playerDismissedByUser
+        ) return
         openLivePlayer()
     }
 
@@ -488,6 +492,7 @@ class MainActivity : AppCompatActivity() {
         playerPendingReveal = false
 
         webView.visibility = View.VISIBLE
+        webView.requestFocus()
         webView.alpha = 0f
         webView.scaleX = 0.96f
         webView.scaleY = 0.96f
@@ -526,6 +531,8 @@ class MainActivity : AppCompatActivity() {
                 webView.visibility = View.GONE
                 // 停止视频解码与网络拉流
                 webView.loadUrl("about:blank")
+                // 清空历史，避免信息卡片按返回时又导回播放页
+                webView.clearHistory()
                 webView.alpha = 1f
 
                 splashContainer.alpha = 0f
@@ -645,6 +652,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 fullscreenView = view
+                fullscreenCallback = callback
                 webView.visibility = View.GONE
                 (window.decorView as ViewGroup).addView(
                     view,
@@ -656,13 +664,21 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onHideCustomView() {
-                fullscreenView?.let {
-                    (window.decorView as ViewGroup).removeView(it)
-                }
-                fullscreenView = null
-                if (playerVisible) webView.visibility = View.VISIBLE
+                exitHtml5Fullscreen()
             }
         }
+    }
+
+    /**
+     * 退出 HTML5 全屏（返回键或页面自行退出时共用）。
+     */
+    private fun exitHtml5Fullscreen() {
+        val view = fullscreenView ?: return
+        fullscreenView = null
+        (window.decorView as ViewGroup).removeView(view)
+        fullscreenCallback?.onCustomViewHidden()
+        fullscreenCallback = null
+        if (playerVisible) webView.visibility = View.VISIBLE
     }
 
     /**
@@ -800,8 +816,9 @@ class MainActivity : AppCompatActivity() {
      * 遥控器按键处理：
      * - DPAD 上下/左右：导航焦点（系统默认处理）
      * - OK/ENTER：复制地址到剪贴板（聚焦信息卡片时）或触发重启（聚焦重启按钮时）
-     * - BACK：移到后台（不退出）
      * - MENU：同 OK
+     * - BACK：不在此拦截（拦截会导致 onBackPressed 收不到 UP 轨迹回调），
+     *   统一交给 onBackPressed 处理（退全屏/退播放页/退历史/退后台）。
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         when (keyCode) {
@@ -833,22 +850,22 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
             }
-            KeyEvent.KEYCODE_BACK -> {
-                if (webView.canGoBack()) {
-                    webView.goBack()
-                    return true
-                }
-                moveTaskToBack(true)
-                return true
-            }
         }
         return super.onKeyDown(keyCode, event)
     }
 
     /**
-     * 按返回键时不退出 App，而是移到后台。
+     * 返回键统一处理（遥控器/鼠标/手势都走这里）：
+     * 1. HTML5 全屏播放中 → 先退出全屏
+     * 2. 直播播放页展示中 → 退出播放页，回到信息卡片
+     * 3. WebView 有历史 → 后退
+     * 4. 否则 → 移到后台（不退出 App）
      */
     override fun onBackPressed() {
+        if (fullscreenView != null) {
+            exitHtml5Fullscreen()
+            return
+        }
         // 直播播放页展示时：返回键先退出播放页，回到信息卡片
         if (playerVisible) {
             closeLivePlayer()

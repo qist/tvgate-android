@@ -65,8 +65,9 @@
 
 ### 直播接口自动打开
 
-TVGate 的「直播接口」即 H5 播放器模块。当 `config.yaml` 中 `player.enabled: true` 时，
-App 在服务就绪后自动打开直播页，机顶盒开机即进入看电视状态：
+TVGate 的「直播接口」即 H5 播放器模块。当 `config.yaml` 中 `player.enabled: true` 且
+`player.android_autoplay` 未设为 `false` 时，App 在服务就绪后自动打开直播页，
+机顶盒开机即进入看电视状态：
 
 - 使用 TVGate 内置独立播放页 `/pp`（`http://127.0.0.1:{port}/pp`，回环访问不受网络切换影响）
 - 等播放页加载完成再做过渡动画（信息卡片淡出、播放页淡入），不露白屏
@@ -85,6 +86,7 @@ App 从 `config.yaml` 读取以下配置并实时更新界面：
 | `web.password` | Web 管理界面密码 | `admin` |
 | `web.path` | Web 管理界面路径 | `/web/` |
 | `player.enabled` | 直播接口（H5 播放器），开启后启动自动打开直播页 | `false` |
+| `player.android_autoplay` | 安卓启动是否进入播放页标记位；`false` 时启动停留在信息界面不打开直播页（可在 Web 后台「播放器」页开关，服务端不控制行为） | 未配置（进入） |
 | `dns.servers` | DNS 服务器列表 | 不配置，默认走系统/本地 DNS |
 
 首次启动时 `config.yaml` 可能不存在，TVGate 二进制启动后会自动生成默认配置，
@@ -239,10 +241,11 @@ run 底部下载（当前不创建 GitHub Release）。
    `libtvgate.so` 拷贝到应用私有 `files/` 目录并 `chmod +x`。
 3. 用 `Runtime.exec` 启动 `tvgate -config <filesDir>/config.yaml`。
 4. `MainActivity` 轮询本地服务端口就绪后，更新界面显示局域网访问信息。
-5. `ConfigParser` 从 `config.yaml` 读取端口、账号、密码、路径、直播开关。
+5. `ConfigParser` 从 `config.yaml` 读取端口、账号、密码、路径、直播开关、安卓自动播放标记。
 6. `NetworkUtils` 检测设备局域网 IP 地址。
 7. 使用 ZXing 生成访问地址二维码显示在界面上。
-8. `player.enabled: true` 时，服务就绪后自动经 WebView 打开 `/pp` 直播页。
+8. `player.enabled: true` 且 `player.android_autoplay` 未设为 `false` 时，
+   服务就绪后自动经 WebView 打开 `/pp` 直播页。
 
 ## 配置 TVGate
 

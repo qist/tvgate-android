@@ -23,7 +23,10 @@ data class TVGateConfig(
     val password: String = "admin",
     val webPath: String = "/web/",
     // 直播接口（H5 播放器模块）是否开启
-    val playerEnabled: Boolean = false
+    val playerEnabled: Boolean = false,
+    // player.android_autoplay 标记位：null=未配置（保持原行为，自动打开），
+    // false=安卓启动不进入播放页，true=进入。与 Go 侧 *bool 语义一致。
+    val androidAutoplay: Boolean? = null
 ) {
     /**
      * 构建完整的 Web 管理界面 URL，例如 http://192.168.1.100:8888/web/
@@ -81,6 +84,7 @@ object ConfigParser {
         var password = "admin"
         var webPath = "/web/"
         var playerEnabled = false
+        var androidAutoplay: Boolean? = null
 
         var currentSection = ""
 
@@ -125,10 +129,13 @@ object ConfigParser {
                 currentSection == "player" && key == "enabled" -> {
                     playerEnabled = value.equals("true", ignoreCase = true)
                 }
+                currentSection == "player" && key == "android_autoplay" -> {
+                    androidAutoplay = value.equals("true", ignoreCase = true)
+                }
             }
         }
 
-        return TVGateConfig(port, username, password, webPath, playerEnabled)
+        return TVGateConfig(port, username, password, webPath, playerEnabled, androidAutoplay)
     }
 
     /**
