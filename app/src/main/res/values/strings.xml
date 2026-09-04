@@ -33,6 +33,9 @@
     <string name="restart_success">内核已重启</string>
     <string name="restart_failed">重启失败</string>
 
+    <!-- 直播播放页 -->
+    <string name="player_back_hint">已进入直播，按返回键回到主页</string>
+
     <!-- 前台通知文案 -->
     <string name="notif_running_title">TVGate 运行中</string>
     <string name="notif_running_text">本地转发服务已启动 · 127.0.0.1:8888</string>

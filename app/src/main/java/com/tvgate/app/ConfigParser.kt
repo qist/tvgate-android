@@ -21,7 +21,9 @@ data class TVGateConfig(
     val port: Int = 8888,
     val username: String = "admin",
     val password: String = "admin",
-    val webPath: String = "/web/"
+    val webPath: String = "/web/",
+    // 直播接口（H5 播放器模块）是否开启
+    val playerEnabled: Boolean = false
 ) {
     /**
      * 构建完整的 Web 管理界面 URL，例如 http://192.168.1.100:8888/web/
@@ -37,6 +39,15 @@ data class TVGateConfig(
     fun buildLocalUrl(): String {
         val path = if (webPath.endsWith("/")) webPath else "$webPath/"
         return "http://127.0.0.1:$port$path"
+    }
+
+    /**
+     * 构建直播播放器（H5）独立入口 URL。
+     * /pp 为 TVGate 内置的独立播放页（不跳转后台隐藏路径），
+     * 本机回环访问最可靠（不受网络切换影响），例如 http://127.0.0.1:8888/pp
+     */
+    fun buildPlayerUrl(): String {
+        return "http://127.0.0.1:$port/pp"
     }
 }
 
@@ -69,6 +80,7 @@ object ConfigParser {
         var username = "admin"
         var password = "admin"
         var webPath = "/web/"
+        var playerEnabled = false
 
         var currentSection = ""
 
@@ -110,10 +122,13 @@ object ConfigParser {
                 currentSection == "web" && key == "path" -> {
                     webPath = value
                 }
+                currentSection == "player" && key == "enabled" -> {
+                    playerEnabled = value.equals("true", ignoreCase = true)
+                }
             }
         }
 
-        return TVGateConfig(port, username, password, webPath)
+        return TVGateConfig(port, username, password, webPath, playerEnabled)
     }
 
     /**

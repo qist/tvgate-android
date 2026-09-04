@@ -45,6 +45,28 @@ if [ ! -f "$TVGATE_SRC/go.mod" ]; then
   exit 1
 fi
 
+# ---- 构建 TVGate Web 前端（SPA 双入口：管理后台 + H5 直播播放器 /pp） ----
+# web/dist 不进 git（.gitignore 只保留 .gitkeep），go:embed all:dist 嵌入的是
+# 源码树磁盘上的产物；跳过此步二进制里只有占位页（管理后台与直播播放器均不可
+# 用）。与上游 Makefile 的 web-ui 目标逻辑一致：仅当 ui 源码比构建产物新或产
+# 物缺失时才跑 npm，避免每次构建都重复安装/打包。
+DIST_STAMP="$TVGATE_SRC/web/dist/.built"
+UI_DIR="$TVGATE_SRC/ui"
+if [ ! -f "$DIST_STAMP" ] ||
+   [ -n "$(find "$UI_DIR/src" "$UI_DIR/package.json" "$UI_DIR/package-lock.json" \
+          -type f -newer "$DIST_STAMP" -print -quit 2>/dev/null)" ]; then
+  echo "==> building TVGate web UI (npm) ..."
+  command -v npm >/dev/null 2>&1 || {
+    echo "ERROR: 未检测到 npm，无法构建 Web 前端（H5 直播播放器/管理后台将不可用）" >&2
+    exit 1
+  }
+  [ -d "$UI_DIR/node_modules" ] || (cd "$UI_DIR" && npm install)
+  (cd "$UI_DIR" && npm run build)   # vite 直接输出到 ../web/dist（emptyOutDir）
+  touch "$DIST_STAMP"
+else
+  echo "==> TVGate web UI 已是最新，跳过 npm 构建"
+fi
+
 # ---- 定位 NDK ----
 if [ -n "${ANDROID_NDK_HOME:-}" ]; then
   NDK="$ANDROID_NDK_HOME"

@@ -22,11 +22,14 @@ import android.util.DisplayMetrics
 import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AnimationUtils
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -36,6 +39,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
@@ -61,6 +66,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRestart: TextView
     private val handler = Handler(Looper.getMainLooper())
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    // ===== 直播播放页（H5 播放器 /pp 独立入口）=====
+    private var playerVisible = false          // 播放页是否正在展示
+    private var playerPendingReveal = false    // 已开始加载、等待页面就绪后做过渡动画
+    private var playerDismissedByUser = false  // 用户按返回退出后，本次会话不再自动打开
+    private var playerOpenHintShown = false    // “按返回键回到主页”提示只弹一次
+    private var fullscreenView: View? = null   // HTML5 全屏视频容器
 
     // 当前配置（首次启动时 config.yaml 可能还不存在，用默认值）
     private var config: TVGateConfig = TVGateConfig()
@@ -440,6 +452,129 @@ class MainActivity : AppCompatActivity() {
         statusText.startAnimation(textAnim)
     }
 
+    // ==================== 直播播放页（启动自动打开） ====================
+
+    /**
+     * 服务就绪后按配置决定是否自动打开直播接口。
+     * 仅在 config.yaml 中 player.enabled: true 时打开；
+     * 用户按返回键退出后，本次会话不再自动打开。
+     */
+    private fun maybeOpenLivePlayer() {
+        if (!config.playerEnabled || playerVisible || playerDismissedByUser) return
+        openLivePlayer()
+    }
+
+    /**
+     * 打开直播播放页：先在后台加载 /pp，页面就绪后做优雅过渡。
+     */
+    private fun openLivePlayer() {
+        playerVisible = true
+        playerPendingReveal = true
+        webView.loadUrl(config.buildPlayerUrl())
+        enterImmersiveMode()
+
+        if (!playerOpenHintShown) {
+            playerOpenHintShown = true
+            Toast.makeText(this, R.string.player_back_hint, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /**
+     * 播放页加载完成的过渡动画：
+     * 信息卡片淡出下移，播放页自下方微微放大淡入，形成顺滑的“揭幕”效果。
+     */
+    private fun revealPlayerPage() {
+        if (!playerVisible || !playerPendingReveal) return
+        playerPendingReveal = false
+
+        webView.visibility = View.VISIBLE
+        webView.alpha = 0f
+        webView.scaleX = 0.96f
+        webView.scaleY = 0.96f
+        webView.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setStartDelay(80)
+            .setDuration(450)
+            .withEndAction {
+                webView.scaleX = 1f
+                webView.scaleY = 1f
+            }
+            .start()
+
+        splashContainer.animate()
+            .alpha(0f)
+            .setDuration(300)
+            .withEndAction { splashContainer.visibility = View.GONE }
+            .start()
+    }
+
+    /**
+     * 退出直播播放页，回到信息卡片。反向过渡。
+     */
+    private fun closeLivePlayer() {
+        playerVisible = false
+        playerDismissedByUser = true
+        playerPendingReveal = false
+        exitImmersiveMode()
+
+        webView.animate()
+            .alpha(0f)
+            .setDuration(250)
+            .withEndAction {
+                webView.visibility = View.GONE
+                // 停止视频解码与网络拉流
+                webView.loadUrl("about:blank")
+                webView.alpha = 1f
+
+                splashContainer.alpha = 0f
+                splashContainer.visibility = View.VISIBLE
+                splashContainer.animate()
+                    .alpha(1f)
+                    .setDuration(300)
+                    .start()
+            }
+            .start()
+    }
+
+    /**
+     * 沉浸式全屏：隐藏状态栏/导航栏，播放页视觉更干净。
+     */
+    private fun enterImmersiveMode() {
+        // 兜底压黑系统栏：即使隐藏失败也不露白条
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            @Suppress("DEPRECATION")
+            window.statusBarColor = Color.BLACK
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = Color.BLACK
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+            window.insetsController?.hide(android.view.WindowInsets.Type.systemBars())
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            )
+        }
+    }
+
+    private fun exitImmersiveMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(true)
+            window.insetsController?.show(android.view.WindowInsets.Type.systemBars())
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        }
+    }
+
     override fun onDestroy() {
         try {
             unregisterReceiver(errorReceiver)
@@ -462,18 +597,71 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupWebView() {
+        webView.setBackgroundColor(Color.BLACK)
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
             allowFileAccess = true
+            // 直播页启动后自动起播，无需用户手势
+            mediaPlaybackRequiresUserGesture = false
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             }
+        }
+        // 文档启动脚本：播放器默认主题 auto（系统浅色模式时会渲染白色顶栏），
+        // 在页面任何 JS 执行前预置为深色。注意 player.html 早期脚本与
+        // usePersistedEnum 都按裸字符串比较（'dark'，不带 JSON 引号），
+        // 带引号会判不出、且 React 挂载后会把非法值删除。
+        // 仅当用户未手动选过主题时生效，用户在播放器里选的主题仍被尊重。
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            WebViewCompat.addDocumentStartJavaScript(
+                webView,
+                "try{if(localStorage.getItem('tvgate-player-theme')===null){" +
+                    "localStorage.setItem('tvgate-player-theme','dark')" +
+                "}}catch(e){}",
+                setOf("*")
+            )
         }
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
                 view: WebView?, request: WebResourceRequest?
             ): Boolean = false
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                // 部分机型导航后会重置 WebView 底色，重新压黑避免白闪
+                view?.setBackgroundColor(Color.BLACK)
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                // 播放页就绪后再做过渡动画，避免露出白屏/加载中
+                revealPlayerPage()
+            }
+        }
+        // 支持 H5 播放器的网页全屏按钮（HTML5 fullscreen API）
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                if (fullscreenView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                fullscreenView = view
+                webView.visibility = View.GONE
+                (window.decorView as ViewGroup).addView(
+                    view,
+                    FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                )
+            }
+
+            override fun onHideCustomView() {
+                fullscreenView?.let {
+                    (window.decorView as ViewGroup).removeView(it)
+                }
+                fullscreenView = null
+                if (playerVisible) webView.visibility = View.VISIBLE
+            }
         }
     }
 
@@ -512,6 +700,9 @@ class MainActivity : AppCompatActivity() {
 
                         progressBar.visibility = View.GONE
                         statusText.text = "服务已就绪，可扫码或输入地址访问"
+
+                        // 直播接口开启时，启动即打开直播页
+                        maybeOpenLivePlayer()
                     }
                     return@Thread
                 }
@@ -658,6 +849,11 @@ class MainActivity : AppCompatActivity() {
      * 按返回键时不退出 App，而是移到后台。
      */
     override fun onBackPressed() {
+        // 直播播放页展示时：返回键先退出播放页，回到信息卡片
+        if (playerVisible) {
+            closeLivePlayer()
+            return
+        }
         if (webView.canGoBack()) {
             webView.goBack()
         } else {

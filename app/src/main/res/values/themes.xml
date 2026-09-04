@@ -5,10 +5,12 @@
     <attr name="colorSplashAppName" format="color" />
     <attr name="colorSplashStatus" format="color" />
 
-    <!-- 主主题（DayNight 自动切换深浅色） -->
+    <!-- 主主题：整窗深色（splash 设计为深色；直播 WebView 也要求无白色底）
+         windowBackground 深色可消除启动瞬间与浅色模式下的白条/白闪 -->
     <style name="Theme.TVGateApp" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/splash_bg_dark</item>
+        <item name="android:statusBarColor">@color/splash_bg_dark</item>
+        <item name="android:navigationBarColor">@color/splash_bg_dark</item>
         <item name="colorSplashBackground">@color/splash_bg_dark</item>
         <item name="colorSplashAppName">@color/splash_app_name_color</item>
         <item name="colorSplashStatus">@color/splash_status_normal</item>
