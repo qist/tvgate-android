@@ -6,6 +6,10 @@
 
 专为**机顶盒、电视盒子、Android TV** 设计，支持遥控器操作。
 
+> **服务端上游项目**：[qist/tvgate](https://github.com/qist/tvgate) —— App
+> 不内置二进制源码，构建时自动 clone 该仓库源码交叉编译进 APK（见
+> [构建](#构建)与 [build-android.sh](build-android.sh)）。
+
 ## ⚠️ 关于 Android 4.0 的重要说明
 
 **本 App 无法安装到 Android 4.0（API 15）或 4.4（API 19）设备。**
@@ -303,7 +307,7 @@ sync:
     timeout: 15s              # 单次 API/下载请求超时
 ```
 
-> 详细设计见 [tvgate 服务端 doc/sync-dev.md](https://github.com/qist/tvgate/blob/main/doc/sync-dev.md)。
+> 详细设计见 [tvgate 服务端 doc/SYNC.md](https://github.com/qist/tvgate/blob/main/doc/SYNC.md)。
 
 ### DNS 配置
 
