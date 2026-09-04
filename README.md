@@ -59,6 +59,17 @@
 - **访问二维码**（手机扫码即可打开，ZXing 生成）
 - 点击信息卡片可复制访问地址到剪贴板
 
+### 直播接口自动打开
+
+TVGate 的「直播接口」即 H5 播放器模块。当 `config.yaml` 中 `player.enabled: true` 时，
+App 在服务就绪后自动打开直播页，机顶盒开机即进入看电视状态：
+
+- 使用 TVGate 内置独立播放页 `/pp`（`http://127.0.0.1:{port}/pp`，回环访问不受网络切换影响）
+- 等播放页加载完成再做过渡动画（信息卡片淡出、播放页淡入），不露白屏
+- 沉浸式全屏（隐藏状态栏/导航栏）+ 启动即自动起播，无需点击
+- 支持 H5 播放器的网页全屏按钮；深色界面，浅色系统下也不会出现白色顶栏
+- **返回键**退出直播页回到信息卡片，且本次会话不再自动弹出（首次进入有提示）
+
 ### 动态配置
 
 App 从 `config.yaml` 读取以下配置并实时更新界面：
@@ -69,6 +80,7 @@ App 从 `config.yaml` 读取以下配置并实时更新界面：
 | `web.username` | Web 管理界面账号 | `admin` |
 | `web.password` | Web 管理界面密码 | `admin` |
 | `web.path` | Web 管理界面路径 | `/web/` |
+| `player.enabled` | 直播接口（H5 播放器），开启后启动自动打开直播页 | `false` |
 | `dns.servers` | DNS 服务器列表 | 不配置，默认走系统/本地 DNS |
 
 首次启动时 `config.yaml` 可能不存在，TVGate 二进制启动后会自动生成默认配置，
@@ -83,7 +95,7 @@ App 会检测配置文件出现后自动重新读取并更新界面。
 | **方向键** | 切换焦点（导航信息卡片、重启按钮） |
 | **OK / 确认键** | 聚焦信息卡片时复制地址，聚焦重启按钮时重启内核 |
 | **菜单键** | 同 OK 键 |
-| **返回键** | 退到后台运行（不退出 App） |
+| **返回键** | 直播页展示时先退出直播页回信息卡片；否则退到后台运行（不退出 App） |
 
 界面元素支持焦点高亮，遥控器选中时显示蓝色边框。
 
@@ -127,6 +139,8 @@ App 启动时自动检查 GitHub 最新 Release 版本，与本地安装版本�
 - Go 1.25+
 - Android NDK（`$ANDROID_NDK_HOME` 或 `$ANDROID_HOME/ndk/*`）
 - Android SDK（build-tools 含 `zipalign` / `apksigner`）
+- Node.js 20+（含 npm，构建 TVGate Web 前端；`web/dist` 不进 git，缺失时
+  二进制内只有占位页）
 - TVGate 服务端源码（`$TVGATE_SRC`，默认 `../tvgate`）
 
   ```bash
@@ -187,8 +201,8 @@ Build → Build Bundle(s) / APK(s) → Build APK(s)
 ## GitHub Actions 自动构建
 
 仓库已配置 `.github/workflows/build.yml`：push 到 `main` 或手动触发后，
-CI 会自动完成「clone 服务端源码 → 交叉编译 → 分架构打包 → 签名 → 上传 artifact
-→ 创建 GitHub Release」。
+CI 会自动完成「clone 服务端源码 → 构建 Web 前端 → 交叉编译 → 分架构打包 →
+签名 → 上传 artifact」。
 
 ### 需要配置的 Secrets（仓库 Settings → Secrets and variables → Actions）
 
@@ -198,8 +212,13 @@ CI 会自动完成「clone 服务端源码 → 交叉编译 → 分架构打包 
 | `TVGATE_KS_PASS` | 密钥密码 |
 
 密钥别名 CI 默认 `tvgate`（workflow 中 `env.TVGATE_KS_ALIAS` 可改）。
-构建完成后会自动创建/更新对应版本的 GitHub **Release**（App 在线更新即依赖它），
-APK 同时以 `tvgate-apks-<版本>` artifact 存留，可在 Actions 页面下载。
+构建产物以 `tvgate-apks-<版本>` **artifact** 形式存留，在 Actions 页面对应
+run 底部下载（当前不创建 GitHub Release）。
+
+> **在线更新说明**：App 在线更新依赖 GitHub `releases/latest`。CI 不再创建
+> Release 后，在线更新检查将检测不到新版本并静默跳过；如需测试在线更新，
+> 可手动发布 Release（APK 命名 `TVGate-<版本>-<abi>.apk`）或临时恢复
+> Release 步骤。
 
 > 若 `qist/tvgate` 为私有仓库，请把 workflow 里的 clone 地址改为带凭据的
 > URL（凭据存为另一个 Secret）。
@@ -207,8 +226,7 @@ APK 同时以 `tvgate-apks-<版本>` artifact 存留，可在 Actions 页面下�
 ### 手动触发 / 覆盖版本号
 
 `Actions → Build APK → Run workflow` 时可填 `version` 覆盖 APK 版本号
-（默认用 tvgate 源码 `config/version`）。在线更新测试时，可据此用一个更高版本
-打包：旧版 App 打开会检测到 `releases/latest` 更高版本并提示下载更新。
+（默认用 tvgate 源码 `config/version`），产物以该版本号命名 artifact。
 
 ## 工作原理
 
@@ -217,9 +235,10 @@ APK 同时以 `tvgate-apks-<版本>` artifact 存留，可在 Actions 页面下�
    `libtvgate.so` 拷贝到应用私有 `files/` 目录并 `chmod +x`。
 3. 用 `Runtime.exec` 启动 `tvgate -config <filesDir>/config.yaml`。
 4. `MainActivity` 轮询本地服务端口就绪后，更新界面显示局域网访问信息。
-5. `ConfigParser` 从 `config.yaml` 读取端口、账号、密码、路径。
+5. `ConfigParser` 从 `config.yaml` 读取端口、账号、密码、路径、直播开关。
 6. `NetworkUtils` 检测设备局域网 IP 地址。
 7. 使用 ZXing 生成访问地址二维码显示在界面上。
+8. `player.enabled: true` 时，服务就绪后自动经 WebView 打开 `/pp` 直播页。
 
 ## 配置 TVGate
 
