@@ -24,6 +24,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AnimationUtils
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -643,6 +644,21 @@ class MainActivity : AppCompatActivity() {
                 // 播放页就绪后再做过渡动画，避免露出白屏/加载中
                 revealPlayerPage()
             }
+
+            // WebView 渲染进程崩溃（GPU 异常/低内存，模拟器与低端盒子高发）：
+            // 表现为页面黑屏且触摸完全无响应。标准兜底是重建 WebView 恢复页面，
+            // 返回 true 表示本 Activity 已处理，系统不再回收 Activity。
+            override fun onRenderProcessGone(
+                view: WebView,
+                detail: RenderProcessGoneDetail
+            ): Boolean {
+                android.util.Log.w(
+                    "TVGate",
+                    "webview renderer gone (didCrash=${detail.didCrash()})，重建 WebView 恢复"
+                )
+                rebuildWebViewAfterRendererGone()
+                return true
+            }
         }
         // 支持 H5 播放器的网页全屏按钮（HTML5 fullscreen API）
         webView.webChromeClient = object : WebChromeClient() {
@@ -653,6 +669,8 @@ class MainActivity : AppCompatActivity() {
                 }
                 fullscreenView = view
                 fullscreenCallback = callback
+                // 手机上 H5 全屏 → 强制横屏（盒子固定横屏不受影响）；configChanges 已配旋转不重建
+                requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                 webView.visibility = View.GONE
                 (window.decorView as ViewGroup).addView(
                     view,
@@ -678,7 +696,48 @@ class MainActivity : AppCompatActivity() {
         (window.decorView as ViewGroup).removeView(view)
         fullscreenCallback?.onCustomViewHidden()
         fullscreenCallback = null
+        // 恢复系统默认方向（手机回到竖屏跟随传感器）
+        requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         if (playerVisible) webView.visibility = View.VISIBLE
+    }
+
+    // 渲染进程崩溃重建节流：60 秒内第二次崩溃则退回信息界面，避免无限重建循环
+    private var lastRendererRebuildAt = 0L
+
+    /**
+     * 渲染进程崩溃后的恢复：新建 WebView 替换布局中的旧实例（渲染进程崩溃后
+     * 旧实例已永久黑屏、触摸无响应），重跑初始化并恢复崩溃前所在的页面。
+     */
+    private fun rebuildWebViewAfterRendererGone() {
+        val container = webView.parent as? ViewGroup ?: return
+        val index = container.indexOfChild(webView)
+        val params = webView.layoutParams
+        container.removeView(webView)
+
+        val fresh = WebView(this)
+        fresh.id = R.id.webView
+        webView = fresh
+        container.addView(fresh, index.coerceAtLeast(0), params)
+
+        // 重置播放页与全屏状态（旧实例的页面状态已丢失）
+        playerVisible = false
+        playerPendingReveal = false
+        fullscreenView = null
+        fullscreenCallback = null
+        setupWebView()
+
+        val now = android.os.SystemClock.elapsedRealtime()
+        val wasInPlayer = splashContainer.visibility == View.GONE
+        if (wasInPlayer && now - lastRendererRebuildAt > 60_000L) {
+            lastRendererRebuildAt = now
+            // 崩溃前在播放页：直接重新打开（服务端仍在运行，回环地址即刻可达）
+            openLivePlayer()
+        } else {
+            // 频繁崩溃或崩溃前在信息界面：回信息界面兜底
+            exitImmersiveMode()
+            splashContainer.alpha = 1f
+            splashContainer.visibility = View.VISIBLE
+        }
     }
 
     /**
