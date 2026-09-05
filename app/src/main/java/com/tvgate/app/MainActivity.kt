@@ -616,16 +616,14 @@ class MainActivity : AppCompatActivity() {
                 mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             }
         }
-        // 文档启动脚本：播放器默认主题 auto（系统浅色模式时会渲染白色顶栏），
-        // 在页面任何 JS 执行前预置为深色。注意 player.html 早期脚本与
-        // usePersistedEnum 都按裸字符串比较（'dark'，不带 JSON 引号），
-        // 带引号会判不出、且 React 挂载后会把非法值删除。
-        // 仅当用户未手动选过主题时生效，用户在播放器里选的主题仍被尊重。
+        // 文档启动脚本：播放器主题持久化 key 为 tvgate.theme（ui/src/hooks/use-theme.ts），
+        // 仅当用户从未设置过主题时预置为深色（浅色系统下避免白色顶栏）；
+        // 用户在播放器里手动选的主题写入同一 key，会被尊重不再覆盖。
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(
                 webView,
-                "try{if(localStorage.getItem('tvgate-player-theme')===null){" +
-                    "localStorage.setItem('tvgate-player-theme','dark')" +
+                "try{if(localStorage.getItem('tvgate.theme')===null){" +
+                    "localStorage.setItem('tvgate.theme','dark')" +
                 "}}catch(e){}",
                 setOf("*")
             )
