@@ -881,12 +881,13 @@ class MainActivity : AppCompatActivity() {
     // ==================== 在线 APK 更新 ====================
 
     /**
-     * 静默检查更新：对比 GitHub Latest 版本与本地版本。
+     * 静默检查更新：仅在 App 打开（onCreate）时执行一次，提示与否由用户决定，不强制。
      * - 网络不通：AppUpdater 内部跳过验证（本地版本优于远程，直接忽略）。
-     * - 有新版：弹出更新对话框。
+     * - 有新版：弹出更新对话框（可取消）。
      */
     private fun checkForUpdate() {
         AppUpdater.checkUpdate(this) { info ->
+            if (isFinishing || isDestroyed) return@checkUpdate
             if (info == null) return@checkUpdate
             showUpdateDialog(info)
         }

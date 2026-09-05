@@ -25,6 +25,8 @@ import java.net.URL
  * 与 tvgate 仓库 tag 一致，因此可直接与 GitHub 发布版本号比较。
  */
 object AppUpdater {
+    private const val TAG = "TVGateUpdate"
+
     // GitHub Releases 最新版 API。发布资产命名：TVGate-{version}-{arm64|arm|x86_64}.apk
     private const val GITHUB_REPO = "qist/tvgate-android"
     private const val LATEST_API = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
@@ -100,25 +102,42 @@ object AppUpdater {
             try {
                 if (!isNetworkAvailable(context)) {
                     // 网络不通，跳过验证
+                    android.util.Log.i(TAG, "update check skipped: no network")
                     info = null
                 } else {
                     val remote = fetchLatest()
-                    if (remote != null && isNewer(context, remote.version)) {
+                    if (remote == null) {
+                        android.util.Log.w(TAG, "update check failed: fetchLatest null (网络/限流/接口异常)")
+                    } else if (!isNewer(context, remote.version)) {
+                        android.util.Log.i(
+                            TAG, "no update: local=${localVersion(context)} remote=${remote.version}"
+                        )
+                    } else {
+                        android.util.Log.i(
+                            TAG, "update available: local=${localVersion(context)} remote=${remote.version}"
+                        )
                         // 当前架构发行版没有对应 APK 时也要跳过
                         val short = abiShortName()
-                        if (short != null) {
+                        if (short == null) {
+                            android.util.Log.w(TAG, "update skipped: unsupported ABI ${Build.SUPPORTED_ABIS.contentToString()}")
+                        } else {
                             // 允许资源名带或不带 "v" 前缀（如 TVGate-3.11.0-arm64.apk / TVGate-v3.11.0-arm64.apk）
                             val apkName = findAssetName(remote.json, remote.version, short)
-                            if (apkName != null) {
+                            if (apkName == null) {
+                                android.util.Log.w(TAG, "update skipped: no asset for v${remote.version}/$short")
+                            } else {
                                 val assetUrl = findAssetUrl(remote.json, apkName)
-                                if (assetUrl != null) {
+                                if (assetUrl == null) {
+                                    android.util.Log.w(TAG, "update skipped: asset $apkName has no download url")
+                                } else {
                                     info = UpdateInfo(remote.version, apkName, assetUrl)
                                 }
                             }
                         }
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.w(TAG, "update check error: ${e.message}")
                 info = null
             }
             mainHandler.post { onResult(info) }

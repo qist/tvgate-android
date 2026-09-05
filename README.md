@@ -66,8 +66,8 @@
 ### 直播接口自动打开
 
 TVGate 的「直播接口」即 H5 播放器模块。当 `config.yaml` 中 `player.enabled: true` 且
-`player.android_autoplay` 未设为 `false` 时，App 在服务就绪后自动打开直播页，
-机顶盒开机即进入看电视状态：
+`player.android_autoplay` 显式为 `true` 时，App 在服务就绪后自动打开直播页，
+机顶盒开机即进入看电视状态（未配置默认不进入）：
 
 - 使用 TVGate 内置独立播放页 `/pp`（`http://127.0.0.1:{port}/pp`，回环访问不受网络切换影响）
 - 等播放页加载完成再做过渡动画（信息卡片淡出、播放页淡入），不露白屏
@@ -124,12 +124,13 @@ App 会检测配置文件出现后自动重新读取并更新界面。
 
 ### 在线 APK 更新
 
-App 启动时自动检查 GitHub 最新 Release 版本，与本地安装版本对比：
+仅在 App 打开时静默检查一次 GitHub 最新 Release 版本，提示与否由用户决定，不强制：
 
 - 调用 `GET /repos/{owner}/{repo}/releases/latest` 获取最新发布版与 APK 资源
 - **本地版本更低** → 弹出「发现新版本」对话框，用户确认后下载并交给系统安装器安装
 - 按当前设备 ABI（arm64 / arm / x86_64）自动匹配对应 APK 资源
 - **网络不可用时自动跳过**更新检查，不影响本地转发服务与正常使用
+- 检查过程写入 logcat（tag `TVGateUpdate`），未提示时可直接过滤排查
 - 升级为覆盖安装：包名与签名一致时，已授权权限与应用数据自动保留
 
 实现见 `AppUpdater.kt`（网络检测、拉取、版本对比、按 ABI 找资源、下载）与
