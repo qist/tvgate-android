@@ -475,6 +475,8 @@ class MainActivity : AppCompatActivity() {
     private fun openLivePlayer() {
         playerVisible = true
         playerPendingReveal = true
+        // 播放期间保持屏幕常亮（前台不熄屏）；后台音频继续由 H5 引擎自由运行
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         webView.loadUrl(config.buildPlayerUrl())
         enterImmersiveMode()
 
@@ -523,6 +525,8 @@ class MainActivity : AppCompatActivity() {
         playerVisible = false
         playerDismissedByUser = true
         playerPendingReveal = false
+        // 退出播放页恢复正常熄屏策略
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         exitImmersiveMode()
 
         webView.animate()
