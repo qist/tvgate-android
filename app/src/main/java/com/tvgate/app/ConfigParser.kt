@@ -24,7 +24,7 @@ data class TVGateConfig(
     val webPath: String = "/web/",
     // 直播接口（H5 播放器模块）是否开启
     val playerEnabled: Boolean = false,
-    // player.android_autoplay 标记位：null=未配置（保持原行为，自动打开），
+    // player.android_autoplay 标记位：null=未配置（默认不自动打开），
     // false=安卓启动不进入播放页，true=进入。与 Go 侧 *bool 语义一致。
     val androidAutoplay: Boolean? = null
 ) {

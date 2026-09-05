@@ -458,11 +458,11 @@ class MainActivity : AppCompatActivity() {
     /**
      * 服务就绪后按配置决定是否自动打开直播接口。
      * 需同时满足：config.yaml 中 player.enabled: true，
-     * 且 player.android_autoplay 未显式设为 false；
+     * 且 player.android_autoplay 显式设为 true（默认关闭，未配置不自动进入）；
      * 用户按返回键退出后，本次会话不再自动打开。
      */
     private fun maybeOpenLivePlayer() {
-        if (!config.playerEnabled || config.androidAutoplay == false ||
+        if (!config.playerEnabled || config.androidAutoplay != true ||
             playerVisible || playerDismissedByUser
         ) return
         openLivePlayer()

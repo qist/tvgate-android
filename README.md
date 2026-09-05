@@ -86,7 +86,7 @@ App 从 `config.yaml` 读取以下配置并实时更新界面：
 | `web.password` | Web 管理界面密码 | `admin` |
 | `web.path` | Web 管理界面路径 | `/web/` |
 | `player.enabled` | 直播接口（H5 播放器），开启后启动自动打开直播页 | `false` |
-| `player.android_autoplay` | 安卓启动是否进入播放页标记位；`false` 时启动停留在信息界面不打开直播页（可在 Web 后台「播放器」页开关，服务端不控制行为） | 未配置（进入） |
+| `player.android_autoplay` | 安卓启动是否进入播放页标记位；`true` 时启动自动进入直播页，未配置默认不进入（可在 Web 后台「播放器」页开关，服务端不控制行为） | 未配置（不进入） |
 | `dns.servers` | DNS 服务器列表 | 不配置，默认走系统/本地 DNS |
 
 首次启动时 `config.yaml` 可能不存在，TVGate 二进制启动后会自动生成默认配置，
@@ -242,8 +242,8 @@ Release 标签。
 5. `ConfigParser` 从 `config.yaml` 读取端口、账号、密码、路径、直播开关、安卓自动播放标记。
 6. `NetworkUtils` 检测设备局域网 IP 地址。
 7. 使用 ZXing 生成访问地址二维码显示在界面上。
-8. `player.enabled: true` 且 `player.android_autoplay` 未设为 `false` 时，
-   服务就绪后自动经 WebView 打开 `/pp` 直播页。
+8. `player.enabled: true` 且 `player.android_autoplay` 显式为 `true` 时，
+   服务就绪后自动经 WebView 打开 `/pp` 直播页（未配置默认不进入）。
 
 ## 配置 TVGate
 
