@@ -218,13 +218,10 @@ CI 会自动完成「clone 服务端源码 → 构建 Web 前端 → 交叉编�
 | `TVGATE_KS_PASS` | 密钥密码 |
 
 密钥别名 CI 默认 `tvgate`（workflow 中 `env.TVGATE_KS_ALIAS` 可改）。
-构建产物以 `tvgate-apks-<版本>` **artifact** 形式存留，在 Actions 页面对应
-run 底部下载（当前不创建 GitHub Release）。
-
-> **在线更新说明**：App 在线更新依赖 GitHub `releases/latest`。CI 不再创建
-> Release 后，在线更新检查将检测不到新版本并静默跳过；如需测试在线更新，
-> 可手动发布 Release（APK 命名 `TVGate-<版本>-<abi>.apk`）或临时恢复
-> Release 步骤。
+构建产物以 `tvgate-apks-<版本>` **artifact** 形式存留（Actions 页面下载），
+同时自动创建同名 **GitHub Release**：APK 命名 `TVGate-<版本>-<abi>.apk`
+上传到对应版本 Release，App 在线更新（依赖 `releases/latest`）可检测到
+新版本并在线升级。
 
 > 若 `qist/tvgate` 为私有仓库，请把 workflow 里的 clone 地址改为带凭据的
 > URL（凭据存为另一个 Secret）。
@@ -232,7 +229,8 @@ run 底部下载（当前不创建 GitHub Release）。
 ### 手动触发 / 覆盖版本号
 
 `Actions → Build APK → Run workflow` 时可填 `version` 覆盖 APK 版本号
-（默认用 tvgate 源码 `config/version`），产物以该版本号命名 artifact。
+（默认用 tvgate 源码 `config/version`），产物以该版本号命名 artifact 与
+Release 标签。
 
 ## 工作原理
 

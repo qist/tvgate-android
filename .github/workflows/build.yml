@@ -9,9 +9,9 @@ on:
         description: '覆盖 APK 版本号（如 3.11.0），留空则用 tvgate 源码 config/version'
         required: false
 
-# 只上传 workflow artifact，不创建 GitHub Release，无需写权限
+# 上传 workflow artifact 并创建 GitHub Release（App 在线更新依赖 releases/latest）
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -88,8 +88,8 @@ jobs:
           echo "version=$TVGATE_VERSION" >> "$GITHUB_OUTPUT"
           echo "TVGate version: $TVGATE_VERSION"
 
-      # 【测试】构建产物以 workflow artifact 形式供下载（不创建 release / 不上传 releases）
-      # 注意：App 在线更新依赖 releases/latest，无 Release 时更新检查将静默跳过
+      # 构建产物以 workflow artifact 形式供 Actions 页面下载，
+      # 同时创建 GitHub Release（App 在线更新依赖 releases/latest 读取版本与 APK）
       - name: Upload APKs as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -99,3 +99,21 @@ jobs:
             TVGate-${{ steps.version.outputs.version }}-arm.apk
             TVGate-${{ steps.version.outputs.version }}-x86_64.apk
           if-no-files-found: error
+
+      - name: Create Release and Upload APKs
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: false
+          body: |
+            TVGate Android APK ${{ steps.version.outputs.version }}
+
+            - arm64-v8a (64位 ARM，主流设备)
+            - armeabi-v7a (32位 ARM，老设备)
+            - x86_64 (模拟器 / Chromebox)
+          files: |
+            TVGate-${{ steps.version.outputs.version }}-arm64.apk
+            TVGate-${{ steps.version.outputs.version }}-arm.apk
+            TVGate-${{ steps.version.outputs.version }}-x86_64.apk
