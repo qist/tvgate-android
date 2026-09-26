@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var portValue: TextView
     private lateinit var remoteHintCard: LinearLayout
     private lateinit var btnRestart: TextView
+    private lateinit var btnLive: TextView
     private val handler = Handler(Looper.getMainLooper())
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
@@ -113,6 +114,8 @@ class MainActivity : AppCompatActivity() {
             handler.post {
                 btnRestart.isEnabled = true
                 btnRestart.text = getString(R.string.btn_restart)
+                // 内核重启期间 /pp 可能不可达，先藏起"进入直播"，就绪后再恢复
+                btnLive.visibility = View.GONE
                 Toast.makeText(this@MainActivity, R.string.restart_success, Toast.LENGTH_SHORT).show()
                 // 刷新信息卡片
                 config = ConfigParser.load(this@MainActivity)
@@ -147,6 +150,7 @@ class MainActivity : AppCompatActivity() {
         portValue = findViewById(R.id.portValue)
         remoteHintCard = findViewById(R.id.remoteHintCard)
         btnRestart = findViewById(R.id.btnRestart)
+        btnLive = findViewById(R.id.btnLive)
 
         // 检测屏幕分辨率，自适应 UI 元素大小
         detectScreenTier()
@@ -158,9 +162,10 @@ class MainActivity : AppCompatActivity() {
         // 先用当前配置（可能是默认值）显示信息卡片
         updateInfoCard()
 
-        // 遥控器/键盘：卡片显示后自动聚焦，方便方向键导航
+        // 遥控器/键盘：卡片显示后自动聚焦，方便方向键导航。
+        // 播放页已开始/正在打开时不抢焦点——焦点归 WebView，避免遥控键走错边。
         ipCard.postDelayed({
-            if (ipCard.visibility == View.VISIBLE) {
+            if (ipCard.visibility == View.VISIBLE && !playerVisible && !playerPendingReveal) {
                 ipCard.requestFocus()
             }
         }, 1200)
@@ -341,11 +346,12 @@ class MainActivity : AppCompatActivity() {
         val hintSp = (10 * scale).coerceIn(9f, 16f)
         findViewById<TextView>(R.id.ipCopyHint).setTextSize(TypedValue.COMPLEX_UNIT_SP, hintSp)
 
-        // 重启按钮文字
+        // 重启/进入直播按钮文字
         val btnSp = (13 * scale).coerceIn(11f, 20f)
         btnRestart.setTextSize(TypedValue.COMPLEX_UNIT_SP, btnSp)
+        btnLive.setTextSize(TypedValue.COMPLEX_UNIT_SP, btnSp)
 
-        // 重启按钮 padding 和最小尺寸
+        // 重启/进入直播按钮 padding 和最小尺寸
         val padHPx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, (16 * scale), resources.displayMetrics
         ).toInt()
@@ -353,6 +359,7 @@ class MainActivity : AppCompatActivity() {
             TypedValue.COMPLEX_UNIT_DIP, (5 * scale), resources.displayMetrics
         ).toInt()
         btnRestart.setPadding(padHPx, padVPx, padHPx, padVPx + 2)
+        btnLive.setPadding(padHPx, padVPx, padHPx, padVPx + 2)
 
         val minW = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, (110 * scale), resources.displayMetrics
@@ -362,6 +369,8 @@ class MainActivity : AppCompatActivity() {
         ).toInt()
         btnRestart.minWidth = minW
         btnRestart.minHeight = minH
+        btnLive.minWidth = minW
+        btnLive.minHeight = minH
     }
 
     /**
@@ -415,6 +424,20 @@ class MainActivity : AppCompatActivity() {
         btnRestart.setOnClickListener {
             triggerRestart()
         }
+
+        // 进入直播按钮点击事件（触屏/鼠标；遥控器走 onKeyDown 的 OK 分支）
+        btnLive.setOnClickListener {
+            openPlayerFromButton()
+        }
+    }
+
+    /**
+     * 手动从启动页进入直播播放页：属于明确意图，不受“按返回退出后不再自动打开”
+     * （playerDismissedByUser）限制；后台未开启直播功能时按钮本就不可见，双保险。
+     */
+    private fun openPlayerFromButton() {
+        if (playerVisible || !config.playerEnabled) return
+        openLivePlayer()
     }
 
     private fun generateQrCode(content: String, sizePx: Int): Bitmap? {
@@ -620,15 +643,30 @@ class MainActivity : AppCompatActivity() {
                 mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             }
         }
-        // 文档启动脚本：播放器主题持久化 key 为 tvgate.theme（ui/src/hooks/use-theme.ts），
-        // 仅当用户从未设置过主题时预置为深色（浅色系统下避免白色顶栏）；
-        // 用户在播放器里手动选的主题写入同一 key，会被尊重不再覆盖。
+        // 文档启动脚本（所有页面注入，均 try/catch 包裹，不影响页面本身）：
+        // 1) 播放器主题持久化 key 为 tvgate.theme（ui/src/hooks/use-theme.ts），
+        //    仅当用户从未设置过主题时预置为深色（浅色系统下避免白色顶栏）；
+        //    用户在播放器里手动选的主题写入同一 key，会被尊重不再覆盖。
+        // 2) 遥控器按键桥 window.TVGateRemote(name)：Android 侧把遥控器键经
+        //    evaluateJavascript 转成 H5 keydown。合成事件派发在当前焦点元素上
+        //    （无焦点则落到 body），沿真实 DOM 路径冒泡——侧栏打开时栏内导航
+        //    照常截获（channel-browser 的 stopPropagation），侧栏关闭时冒泡到
+        //    window 命中 video-player 的全局快捷键（OK 开侧栏/上下换台/左右 seek）。
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(
                 webView,
                 "try{if(localStorage.getItem('tvgate.theme')===null){" +
                     "localStorage.setItem('tvgate.theme','dark')" +
-                "}}catch(e){}",
+                "}}catch(e){};" +
+                "window.TVGateRemote=function(name){try{" +
+                    "var el=document.activeElement;" +
+                    "if(!el||el===document.documentElement)el=document.body;" +
+                    "var ev;" +
+                    "try{ev=new KeyboardEvent('keydown',{key:name,bubbles:true,cancelable:true});}" +
+                    "catch(err){ev=document.createEvent('Event');" +
+                        "ev.initEvent('keydown',true,true);ev.key=name;}" +
+                    "el.dispatchEvent(ev);" +
+                "}catch(e){}};",
                 setOf("*")
             )
         }
@@ -778,6 +816,10 @@ class MainActivity : AppCompatActivity() {
                         progressBar.visibility = View.GONE
                         statusText.text = "服务已就绪，可扫码或输入地址访问"
 
+                        // 后台开启直播功能时，显示"进入直播"手动入口（遥控器可聚焦）
+                        btnLive.visibility =
+                            if (config.playerEnabled) View.VISIBLE else View.GONE
+
                         // 直播接口开启时，启动即打开直播页
                         maybeOpenLivePlayer()
                     }
@@ -890,6 +932,11 @@ class MainActivity : AppCompatActivity() {
                     triggerRestart()
                     return true
                 }
+                // 如果"进入直播"按钮聚焦，打开直播播放页
+                if (btnLive.isFocused && btnLive.visibility == View.VISIBLE) {
+                    openPlayerFromButton()
+                    return true
+                }
                 // 否则：复制地址
                 if (ipCard.visibility == View.VISIBLE) {
                     val ip = NetworkUtils.getLocalIpAddress(this)
@@ -904,6 +951,10 @@ class MainActivity : AppCompatActivity() {
                     triggerRestart()
                     return true
                 }
+                if (btnLive.isFocused && btnLive.visibility == View.VISIBLE) {
+                    openPlayerFromButton()
+                    return true
+                }
                 if (ipCard.visibility == View.VISIBLE) {
                     val ip = NetworkUtils.getLocalIpAddress(this)
                     val url = if (ip != null) config.buildWebUrl(ip) else config.buildLocalUrl()
@@ -913,6 +964,69 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    /**
+     * 遥控器按键桥（仅直播播放页揭幕后生效）。
+     *
+     * 为什么不靠 WebView 自带转发：WebView 只有在自己持有"视图焦点"时才把按键
+     * 递进 H5，而盒子上焦点会被启动期弹窗（更新提示/通知权限）、页面加载、
+     * 自动聚焦定时器来回抢走——表现为 OK 开不了侧栏、左右没反应、上下换台
+     * 时灵时不灵。这里在原生层把 DPAD/OK/数字键直接经 evaluateJavascript
+     * 注入 H5（window.TVGateRemote，见 setupWebView 的文档启动脚本），
+     * 与焦点完全解耦；返回 true 消费事件，WebView 不会再派发一次（不重复）。
+     * BACK 不接管，仍走 onBackPressed 的统一返回逻辑（退全屏/退播放页）。
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (playerVisible && !playerPendingReveal) {
+            val keyName = remoteKeyToJsName(event.keyCode)
+            if (keyName != null) {
+                // 方向键放行长按连发（快速换台/步进 seek）；OK 与数字键只认单击，
+                // 避免长按导致侧栏反复开关、台号狂跳。
+                val forward = event.action == KeyEvent.ACTION_DOWN &&
+                        (event.repeatCount == 0 || isDirectionalKey(event.keyCode))
+                if (forward) {
+                    webView.evaluateJavascript(
+                        "window.TVGateRemote&&TVGateRemote('$keyName')", null
+                    )
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** Android 键码 → H5 KeyboardEvent.key 名；桥接范围外的键返回 null（走系统默认）。 */
+    private fun remoteKeyToJsName(keyCode: Int): String? = when (keyCode) {
+        KeyEvent.KEYCODE_DPAD_UP -> "ArrowUp"
+        KeyEvent.KEYCODE_DPAD_DOWN -> "ArrowDown"
+        KeyEvent.KEYCODE_DPAD_LEFT -> "ArrowLeft"
+        KeyEvent.KEYCODE_DPAD_RIGHT -> "ArrowRight"
+        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> "Enter"
+        in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 ->
+            ('0' + (keyCode - KeyEvent.KEYCODE_0)).toString()
+        else -> null
+    }
+
+    private fun isDirectionalKey(keyCode: Int): Boolean = when (keyCode) {
+        KeyEvent.KEYCODE_DPAD_UP,
+        KeyEvent.KEYCODE_DPAD_DOWN,
+        KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT -> true
+        else -> false
+    }
+
+    /**
+     * 窗口焦点回来时把焦点还给 WebView：更新弹窗/权限弹窗关闭、切后台再回前台，
+     * 都会把视图焦点留在别处或清空。按键已由 dispatchKeyEvent 桥接兜底，
+     * 这里补焦点是让 H5 内部焦点语义（activeElement）保持正常。
+     * HTML5 全屏容器在顶层时不抢它的焦点。
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && playerVisible && !playerPendingReveal && fullscreenView == null) {
+            webView.requestFocus()
+        }
     }
 
     /**
