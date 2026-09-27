@@ -74,6 +74,8 @@ class MainActivity : AppCompatActivity() {
     private var playerPendingReveal = false    // 已开始加载、等待页面就绪后做过渡动画
     private var playerDismissedByUser = false  // 用户按返回退出后，本次会话不再自动打开
     private var playerOpenHintShown = false    // “按返回键回到主页”提示只弹一次
+    private var remoteBridgeReady = false      // 当前文档是否已注入遥控器按键桥
+    private var remoteBridgeWarned = false     // 桥未就绪的告警只打一次，避免刷屏
     private var fullscreenView: View? = null   // HTML5 全屏视频容器
     private var fullscreenCallback: android.webkit.WebChromeClient.CustomViewCallback? = null
 
@@ -647,26 +649,25 @@ class MainActivity : AppCompatActivity() {
         // 1) 播放器主题持久化 key 为 tvgate.theme（ui/src/hooks/use-theme.ts），
         //    仅当用户从未设置过主题时预置为深色（浅色系统下避免白色顶栏）；
         //    用户在播放器里手动选的主题写入同一 key，会被尊重不再覆盖。
-        // 2) 遥控器按键桥 window.TVGateRemote(name)：Android 侧把遥控器键经
-        //    evaluateJavascript 转成 H5 keydown。合成事件派发在当前焦点元素上
-        //    （无焦点则落到 body），沿真实 DOM 路径冒泡——侧栏打开时栏内导航
-        //    照常截获（channel-browser 的 stopPropagation），侧栏关闭时冒泡到
-        //    window 命中 video-player 的全局快捷键（OK 开侧栏/上下换台/左右 seek）。
+        // 2) 遥控器按键桥 window.TVGateRemote(name)，脚本见 REMOTE_BRIDGE_JS。
+        //    DOCUMENT_START_SCRIPT 需要 WebView 自身声明该特性（较新版本才有），
+        //    而 Android 8 盒子的系统 WebView 往往更老、且很多盒子无 Play 商店无法
+        //    升级，此时下面这个 if 会直接不成立——所以桥必须另有兜底注入
+        //    （见 injectRemoteBridge），否则按键会被 dispatchKeyEvent 白白吃掉。
+        // 诊断：盒子上遥控器故障时用 logcat（tag=TVGate）确认 WebView 版本与
+        // document-start 脚本支持情况。
+        android.util.Log.i(
+            "TVGate",
+            "WebView=" + (WebViewCompat.getCurrentWebViewPackage(this)?.versionName ?: "未知") +
+                " documentStartScript=" +
+                WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        )
         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             WebViewCompat.addDocumentStartJavaScript(
                 webView,
                 "try{if(localStorage.getItem('tvgate.theme')===null){" +
                     "localStorage.setItem('tvgate.theme','dark')" +
-                "}}catch(e){};" +
-                "window.TVGateRemote=function(name){try{" +
-                    "var el=document.activeElement;" +
-                    "if(!el||el===document.documentElement)el=document.body;" +
-                    "var ev;" +
-                    "try{ev=new KeyboardEvent('keydown',{key:name,bubbles:true,cancelable:true});}" +
-                    "catch(err){ev=document.createEvent('Event');" +
-                        "ev.initEvent('keydown',true,true);ev.key=name;}" +
-                    "el.dispatchEvent(ev);" +
-                "}catch(e){}};",
+                "}}catch(e){};" + REMOTE_BRIDGE_JS,
                 setOf("*")
             )
         }
@@ -678,9 +679,15 @@ class MainActivity : AppCompatActivity() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 // 部分机型导航后会重置 WebView 底色，重新压黑避免白闪
                 view?.setBackgroundColor(Color.BLACK)
+                // 新文档开始加载：旧文档里的 window.TVGateRemote 已随文档销毁
+                remoteBridgeReady = false
+                remoteBridgeWarned = false
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
+                // 兜底注入按键桥（老 WebView 上 document-start 脚本不可用）。
+                // 必须在 revealPlayerPage() 之前：揭幕后才开始消费按键。
+                injectRemoteBridge()
                 // 播放页就绪后再做过渡动画，避免露出白屏/加载中
                 revealPlayerPage()
             }
@@ -973,7 +980,7 @@ class MainActivity : AppCompatActivity() {
      * 递进 H5，而盒子上焦点会被启动期弹窗（更新提示/通知权限）、页面加载、
      * 自动聚焦定时器来回抢走——表现为 OK 开不了侧栏、左右没反应、上下换台
      * 时灵时不灵。这里在原生层把 DPAD/OK/数字键直接经 evaluateJavascript
-     * 注入 H5（window.TVGateRemote，见 setupWebView 的文档启动脚本），
+     * 注入 H5（window.TVGateRemote，见 REMOTE_BRIDGE_JS），
      * 与焦点完全解耦；返回 true 消费事件，WebView 不会再派发一次（不重复）。
      * BACK 不接管，仍走 onBackPressed 的统一返回逻辑（退全屏/退播放页）。
      */
@@ -981,6 +988,19 @@ class MainActivity : AppCompatActivity() {
         if (playerVisible && !playerPendingReveal) {
             val keyName = remoteKeyToJsName(event.keyCode)
             if (keyName != null) {
+                // 桥未就绪时必须回退系统分发：此时注入不进去，若照样返回 true
+                // 就是"原生吃掉、H5 也没收到"，遥控器会完全无反应（老 WebView 上
+                // 的实测故障）。回退后至少 WebView 持有焦点时仍能收到按键。
+                if (!remoteBridgeReady) {
+                    if (!remoteBridgeWarned) {
+                        remoteBridgeWarned = true
+                        android.util.Log.w(
+                            "TVGate",
+                            "遥控按键桥未就绪，回退系统分发：keyCode=${event.keyCode}"
+                        )
+                    }
+                    return super.dispatchKeyEvent(event)
+                }
                 // 方向键放行长按连发（快速换台/步进 seek）；OK 与数字键只认单击，
                 // 避免长按导致侧栏反复开关、台号狂跳。
                 val forward = event.action == KeyEvent.ACTION_DOWN &&
@@ -994,6 +1014,23 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * 兜底注入遥控器按键桥到当前文档（evaluateJavascript 在 API 19+ 通用，
+     * 不依赖 DOCUMENT_START_SCRIPT 特性）。
+     *
+     * 先按调用顺序下发注入脚本，再回读 typeof 确认；注入被丢弃或执行异常时
+     * 降回未就绪并留一条日志，便于盒子现场（logcat tag=TVGate）排障。
+     */
+    private fun injectRemoteBridge() {
+        webView.evaluateJavascript(REMOTE_BRIDGE_JS, null)
+        webView.evaluateJavascript("(function(){return typeof window.TVGateRemote})()") { r ->
+            remoteBridgeReady = r != null && r.contains("function")
+            if (!remoteBridgeReady) {
+                android.util.Log.w("TVGate", "遥控按键桥注入失败（typeof=$r）")
+            }
+        }
     }
 
     /** Android 键码 → H5 KeyboardEvent.key 名；桥接范围外的键返回 null（走系统默认）。 */
@@ -1168,5 +1205,24 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {
             Toast.makeText(this, R.string.update_install_src_forbidden, Toast.LENGTH_LONG).show()
         }
+    }
+
+    companion object {
+        /**
+         * 遥控器按键桥（定义在 H5 全局）：把键名合成 keydown 派发到当前焦点元素，
+         * 无焦点则落到 body，沿真实 DOM 路径冒泡——侧栏打开时栏内导航照常截获
+         * （channel-browser 的 stopPropagation），侧栏关闭时冒泡到 window 命中
+         * video-player 的全局快捷键（OK 开侧栏/上下换台/左右 seek）。
+         */
+        private const val REMOTE_BRIDGE_JS =
+            "window.TVGateRemote=function(name){try{" +
+                "var el=document.activeElement;" +
+                "if(!el||el===document.documentElement)el=document.body;" +
+                "var ev;" +
+                "try{ev=new KeyboardEvent('keydown',{key:name,bubbles:true,cancelable:true});}" +
+                "catch(err){ev=document.createEvent('Event');" +
+                    "ev.initEvent('keydown',true,true);ev.key=name;}" +
+                "el.dispatchEvent(ev);" +
+            "}catch(e){}};"
     }
 }
