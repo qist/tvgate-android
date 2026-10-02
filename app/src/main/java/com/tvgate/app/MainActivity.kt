@@ -577,6 +577,11 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 沉浸式全屏：隐藏状态栏/导航栏，播放页视觉更干净。
+     *
+     * Android 11+ 额外声明 BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE：边缘下滑呼出的
+     * 系统栏是"瞬态"的——只悬浮在页面上方几秒即自动收回，不会持久占据布局；
+     * 否则一旦被弹窗/操作带出，状态栏会常驻，H5 顶部安全区（safe-area-inset-top）
+     * 随之变化，布局会被反复推移。
      */
     private fun enterImmersiveMode() {
         // 兜底压黑系统栏：即使隐藏失败也不露白条
@@ -588,7 +593,11 @@ class MainActivity : AppCompatActivity() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
-            window.insetsController?.hide(android.view.WindowInsets.Type.systemBars())
+            window.insetsController?.let { controller ->
+                controller.systemBarsBehavior =
+                    android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(android.view.WindowInsets.Type.systemBars())
+            }
         } else {
             @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility = (
@@ -1063,6 +1072,9 @@ class MainActivity : AppCompatActivity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && playerVisible && !playerPendingReveal && fullscreenView == null) {
             webView.requestFocus()
+            // 更新弹窗/权限弹窗/切后台会把系统栏带回来；焦点恢复时重新进入沉浸，
+            // 避免状态栏常驻把 H5 布局顶下去。
+            enterImmersiveMode()
         }
     }
 
