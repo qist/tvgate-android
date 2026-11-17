@@ -21,7 +21,7 @@ android {
             def vf = rootProject.file('version')
             tvgateVer = vf.exists() ? vf.text.trim() : '1.0.0'
         }
-        versionCode 10
+        versionCode 11
         versionName tvgateVer
 
         // 内置 TVGate 二进制作为 JNI 库(libtvgate.so)打包进 lib/<abi>/，
