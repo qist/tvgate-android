@@ -808,17 +808,17 @@ class MainActivity : AppCompatActivity() {
         statusText.text = getString(R.string.starting)
 
         val configFile = File(filesDir, "config.yaml")
-        var configLoaded = configFile.exists()
 
         Thread {
             repeat(80) {
-                // 检测 config.yaml 是否新出现（首次启动场景）
-                if (!configLoaded && configFile.exists()) {
-                    configLoaded = true
-                    val newConfig = ConfigParser.load(this)
-                    handler.post {
-                        config = newConfig
-                        updateInfoCard()
+                // 每轮都重读配置：首次启动时 config.yaml 会先以模板默认值（admin/admin、/web/）出现，
+                // 服务端随后会把默认口令、用户名、访问路径随机化并重写文件。
+                // 只读一次会拿着旧路径做就绪检测（一直 404/502 直到超时），这里持续跟随最新值。
+                if (configFile.exists()) {
+                    val latest = ConfigParser.load(this)
+                    if (latest != config) {
+                        config = latest
+                        handler.post { updateInfoCard() }
                     }
                 }
 

@@ -9,13 +9,13 @@ import java.io.File
  * 读取 filesDir/config.yaml，解析出端口、账号、密码、Web 路径。
  * 使用简单的 YAML 解析（不引入额外依赖），仅提取需要的字段。
  *
- * 配置文件格式示例：
+ * 配置文件格式示例（口令/用户名/路径可能已被服务端随机化，通常带双引号）：
  *   server:
  *     port: 8888
  *   web:
- *     username: admin
- *     password: admin
- *     path: /web/
+ *     username: "admxxxxxxxxx"
+ *     password: "tDs3-H9@7b86c9x="
+ *     path: "/abc123def456/"
  */
 data class TVGateConfig(
     val port: Int = 8888,

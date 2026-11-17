@@ -165,14 +165,8 @@ object NetworkUtils {
     }
 
     /**
-     * 构建完整的 Web 访问 URL，例如 http://192.168.1.100:8888/web/
-     */
-    fun buildWebUrl(ip: String): String {
-        return "http://$ip:8888/web/"
-    }
-
-    /**
      * 构建完整的访问地址（不含路径），例如 http://192.168.1.100:8888
+     * 注意：后台路径可能被随机化，拼完整 URL 请用 ConfigParser 的 TVGateConfig.buildWebUrl()。
      */
     fun buildBaseUrl(ip: String): String {
         return "http://$ip:8888"
