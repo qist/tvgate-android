@@ -331,17 +331,17 @@ class MainActivity : AppCompatActivity() {
         val ipAddrSp = (14 * scale).coerceIn(11f, 18f)
         ipAddressText.setTextSize(TypedValue.COMPLEX_UNIT_SP, ipAddrSp)
 
-        // 账号/密码/端口值：限制最大值避免三列互相遮挡
+        // 账号/密码/端口值：整行显示，字号随屏幕略缩放
         val valueSp = (13 * scale).coerceIn(10f, 15f)
         accountValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
         passwordValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
         portValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
-        // 确保长文本不溢出列宽
-        accountValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
-        passwordValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
-        portValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
-        for (tv in listOf(accountValue, passwordValue, portValue)) {
-            tv.maxLines = 1
+        // 去掉固定 maxWidth：值占据整行剩余宽度，最长 2 行可完整显示随机账号/口令
+        accountValue.maxWidth = Int.MAX_VALUE
+        passwordValue.maxWidth = Int.MAX_VALUE
+        portValue.maxWidth = Int.MAX_VALUE
+        for (tv in listOf(accountValue, passwordValue)) {
+            tv.maxLines = 2
             tv.ellipsize = android.text.TextUtils.TruncateAt.END
         }
 

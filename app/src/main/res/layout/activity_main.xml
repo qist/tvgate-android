@@ -169,99 +169,85 @@
                     android:layout_marginBottom="6dp"
                     android:background="@color/splash_ip_card_border" />
 
-                <!-- 账号 / 密码 / 端口 三列 -->
+                <!-- 账号 / 端口（同一行，左对齐标签 + 右对齐值） -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:weightSum="3">
+                    android:gravity="center_vertical">
 
-                    <!-- 账号 -->
-                    <LinearLayout
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/label_account"
+                        android:textSize="11sp"
+                        android:textColor="@color/splash_ip_hint" />
+
+                    <TextView
+                        android:id="@+id/accountValue"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center">
+                        android:layout_marginStart="8dp"
+                        android:gravity="end"
+                        android:text="@string/default_account"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/splash_ip_value"
+                        android:maxLines="2"
+                        android:ellipsize="end" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/label_account"
-                            android:textSize="11sp"
-                            android:textColor="@color/splash_ip_hint" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="@string/label_port"
+                        android:textSize="11sp"
+                        android:textColor="@color/splash_ip_hint" />
 
-                        <TextView
-                            android:id="@+id/accountValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/default_account"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            android:fontFamily="monospace"
-                            android:textColor="@color/splash_ip_value"
-                            android:maxLines="1"
-                            android:ellipsize="end" />
-                    </LinearLayout>
+                    <TextView
+                        android:id="@+id/portValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/default_port"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/splash_ip_value"
+                        android:maxLines="1" />
+                </LinearLayout>
 
-                    <!-- 密码 -->
-                    <LinearLayout
+                <!-- 密码（独占一行，避免随机口令被截断） -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/label_password"
+                        android:textSize="11sp"
+                        android:textColor="@color/splash_ip_hint" />
+
+                    <TextView
+                        android:id="@+id/passwordValue"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/label_password"
-                            android:textSize="11sp"
-                            android:textColor="@color/splash_ip_hint" />
-
-                        <TextView
-                            android:id="@+id/passwordValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/default_password"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            android:fontFamily="monospace"
-                            android:textColor="@color/splash_ip_value"
-                            android:maxLines="1"
-                            android:ellipsize="end" />
-                    </LinearLayout>
-
-                    <!-- 端口 -->
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:gravity="center">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/label_port"
-                            android:textSize="11sp"
-                            android:textColor="@color/splash_ip_hint" />
-
-                        <TextView
-                            android:id="@+id/portValue"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="@string/default_port"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            android:fontFamily="monospace"
-                            android:textColor="@color/splash_ip_value"
-                            android:maxLines="1"
-                            android:ellipsize="end" />
-                    </LinearLayout>
+                        android:layout_marginStart="8dp"
+                        android:gravity="end"
+                        android:text="@string/default_password"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/splash_ip_value"
+                        android:maxLines="2"
+                        android:ellipsize="end" />
                 </LinearLayout>
 
                 <!-- 点击复制提示 -->
