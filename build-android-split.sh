@@ -46,10 +46,6 @@ export TVGATE_SRC="${TVGATE_SRC:-$(cd "$ROOT/../tvgate" 2>/dev/null && pwd)}"
 # 则以环境变量为准；否则从 tvgate 源码 config/version 读取。
 if [ -n "${TVGATE_VERSION:-}" ]; then
   echo "Override TVGate version: $TVGATE_VERSION"
-elif [ -f "$ROOT/version" ]; then
-  # 本仓库独立版本号（只发 Android 端修复时用，避免改动服务端版本）
-  TVGATE_VERSION="$(tr -d '[:space:]' < "$ROOT/version")"
-  echo "TVGate version: $TVGATE_VERSION (repo version file)"
 else
   VERSION_FILE="$TVGATE_SRC/config/version"
   if [ ! -f "$VERSION_FILE" ]; then

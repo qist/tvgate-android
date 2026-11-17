@@ -95,9 +95,6 @@ class MainActivity : AppCompatActivity() {
     private var screenWidthPx = 1080
     private var screenHeightPx = 1920
 
-    // 访问地址基准字号（sp），长地址单行自适应时会在此基础上最小化
-    private var ipAddrSp = 14f
-
     // 接收服务端进程的错误信息
     private val errorReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -290,20 +287,6 @@ class MainActivity : AppCompatActivity() {
      * - TV 4K：大幅放大，确保远距离可见
      */
     private fun applyUiScaling() {
-        // ---- TV overscan 安全区 ----
-        // 不少电视/盒子（尤其未声明 LEANBACK 的国产机型、老电视）会把画面四周约
-        // 5% 裁掉，贴边的二维码、账号密码、底部按钮会直接看不见。这里按屏宽/高的
-        // 5% 留白，手机/平板仍用布局里的 24dp。
-        val basePad = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, 24f, resources.displayMetrics
-        ).toInt()
-        val isTvTier = screenTier == ScreenTier.TV_720 ||
-            screenTier == ScreenTier.TV_1080 ||
-            screenTier == ScreenTier.TV_4K
-        val safeH = if (isTvTier) maxOf(basePad, (screenWidthPx * 0.05f).toInt()) else basePad
-        val safeV = if (isTvTier) maxOf(basePad, (screenHeightPx * 0.05f).toInt()) else basePad
-        splashContainer.setPadding(safeH, safeV, safeH, safeV)
-
         // 缩放因子：Android 的 dp 已自动处理 DPI 缩放，
         // 所以只需要根据设备类型给出额外缩放即可
         val tvScale = when (screenTier) {
@@ -316,14 +299,7 @@ class MainActivity : AppCompatActivity() {
         val scale = tvScale.coerceIn(0.7f, 1.5f)
 
         // 二维码大小（dp 转 px）
-        var qrDp = (140 * scale).toInt().coerceIn(100, 300)
-        if (isTvTier) {
-            // 安全区内还要容纳 Logo、信息卡片和底部按钮；二维码最多占可用高度约 28%，
-            // 否则内容整体顶到边缘，仍会被电视裁掉一部分。
-            val safeAreaDp = (screenHeightPx - 2 * safeV) / resources.displayMetrics.density
-            val qrMax = (safeAreaDp * 0.28f).toInt().coerceAtLeast(90)
-            qrDp = minOf(qrDp, qrMax)
-        }
+        val qrDp = (140 * scale).toInt().coerceIn(100, 300)
         val qrPx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, qrDp.toFloat(), resources.displayMetrics
         ).toInt()
@@ -353,20 +329,19 @@ class MainActivity : AppCompatActivity() {
 
         // IP 地址文字：限制最大值避免遮挡
         val ipAddrSp = (14 * scale).coerceIn(11f, 18f)
-        this.ipAddrSp = ipAddrSp
         ipAddressText.setTextSize(TypedValue.COMPLEX_UNIT_SP, ipAddrSp)
 
-        // 账号/密码/端口值：整行显示，字号随屏幕略缩放
+        // 账号/密码/端口值：限制最大值避免三列互相遮挡
         val valueSp = (13 * scale).coerceIn(10f, 15f)
         accountValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
         passwordValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
         portValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, valueSp)
-        // 去掉固定 maxWidth：值占据整行剩余宽度，最长 2 行可完整显示随机账号/口令
-        accountValue.maxWidth = Int.MAX_VALUE
-        passwordValue.maxWidth = Int.MAX_VALUE
-        portValue.maxWidth = Int.MAX_VALUE
-        for (tv in listOf(accountValue, passwordValue)) {
-            tv.maxLines = 2
+        // 确保长文本不溢出列宽
+        accountValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
+        passwordValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
+        portValue.maxWidth = (screenWidthPx / 4).coerceAtLeast(80)
+        for (tv in listOf(accountValue, passwordValue, portValue)) {
+            tv.maxLines = 1
             tv.ellipsize = android.text.TextUtils.TruncateAt.END
         }
 
@@ -416,10 +391,6 @@ class MainActivity : AppCompatActivity() {
         passwordValue.text = config.password
         portValue.text = config.port.toString()
 
-        // 地址较长（端口 + 随机路径）时按可用宽度缩小字号，尽量单行显示，
-        // 避免折成两行压缩卡片高度、在电视安全区外被裁掉
-        ipAddressText.post { fitAddressOneLine(fullUrl) }
-
         // 生成二维码
         val qrBitmap = generateQrCode(fullUrl, 480)
         if (qrBitmap != null) {
@@ -459,32 +430,6 @@ class MainActivity : AppCompatActivity() {
         // 进入直播按钮点击事件（触屏/鼠标；遥控器走 onKeyDown 的 OK 分支）
         btnLive.setOnClickListener {
             openPlayerFromButton()
-        }
-    }
-
-    /**
-     * 让访问地址尽量单行显示：按卡片可用宽度从基准字号逐步缩小，
-     * 最低到 10sp（电视远距离可读下限）；仍放不下则自然换行。
-     */
-    private fun fitAddressOneLine(url: String) {
-        val cardPad = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, 14f, resources.displayMetrics
-        ).toInt() * 2
-        // 首次回调时布局可能还没完成（width=0），退化为按屏幕宽度估算，
-        // 避免因为拿不到宽度而保留大字号导致折行
-        val cardWidth = if (ipCard.width > 0) {
-            ipCard.width
-        } else {
-            screenWidthPx - splashContainer.paddingLeft - splashContainer.paddingRight
-        }
-        val avail = cardWidth - cardPad
-        if (avail <= 0) return
-        var sp = ipAddrSp
-        ipAddressText.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
-        val minSp = 10f
-        while (sp > minSp && ipAddressText.paint.measureText(url) > avail) {
-            sp -= 0.5f
-            ipAddressText.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
         }
     }
 

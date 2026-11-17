@@ -82,8 +82,6 @@ jobs:
         run: |
           if [ -n "${{ inputs.version }}" ]; then
             TVGATE_VERSION="${{ inputs.version }}"
-          elif [ -f version ]; then
-            TVGATE_VERSION=$(tr -d '[:space:]' < version)
           else
             TVGATE_VERSION=$(tr -d '[:space:]' < /tmp/tvgate/config/version)
           fi
