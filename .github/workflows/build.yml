@@ -108,11 +108,14 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           prerelease: false
           body: |
-            TVGate Android APK ${{ steps.version.outputs.version }}
+            TVGate Android APK ${{ steps.version.outputs.version }}（versionCode 15，内嵌同版本服务端）
 
-            - arm64-v8a (64位 ARM，主流设备)
-            - armeabi-v7a (32位 ARM，老设备)
-            - x86_64 (模拟器 / Chromebox)
+            - arm64-v8a（64 位 ARM，主流设备）
+            - armeabi-v7a（32 位 ARM，老设备）
+            - x86_64（模拟器 / Chromebox）
+
+            内嵌服务端与本仓库 tag 对齐，改动见：
+            https://github.com/qist/tvgate/releases/tag/${{ steps.version.outputs.version }}
           files: |
             TVGate-${{ steps.version.outputs.version }}-arm64.apk
             TVGate-${{ steps.version.outputs.version }}-arm.apk
